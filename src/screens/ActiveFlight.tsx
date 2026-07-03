@@ -12,7 +12,7 @@ import { positionAt } from '../lib/geo'
 import { startAmbience, stopAmbience, SOUNDSCAPES } from '../lib/audio'
 import runwaysData from '../data/runways.json'
 
-const RUNWAYS = runwaysData as Record<string, { lengthM: number; ident: string }>
+const RUNWAYS = runwaysData as unknown as Record<string, { lengthM: number; ident: string }>
 
 const PHASE_NL: Record<string, string> = {
   roll: 'Startrol',
