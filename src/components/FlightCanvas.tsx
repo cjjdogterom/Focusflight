@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { Route, RouteWaypoint } from '../lib/routeEngine'
 import type { RunwayInfo } from '../lib/runwayGeo'
 import type { Aircraft, Livery } from '../types'
-import { positionAt, bearing, type LngLat } from '../lib/geo'
+import { positionAt, indexAtFraction, bearing, type LngLat } from '../lib/geo'
 import { buildPlaneSVG } from './AircraftSVG'
 import { Plane3D } from './Plane3D'
 import { WORLD_LAND } from '../data/worldLand'
@@ -451,50 +451,56 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
 
     // ---- planned route ----
     if (chart) {
-      // the planned line follows the real geometry: takeoff roll, climb-out
-      // and final/roll-out come from route.segments; waypoints colour the legs
+      // the planned line follows the real geometry (runway roll, fly-by
+      // turns, final); waypoints only decide where the SID/STAR colours end
       const flat: [number, number][] = []
       for (const seg of route.segments) flat.push(...seg)
-      const eq = (pt: [number, number], wp: RouteWaypoint) =>
-        Math.abs(pt[0] - wp.lon) < 1e-9 && Math.abs(pt[1] - wp.lat) < 1e-9
-      let head = -1
-      let tail = -1
+      const nearestIdx = (wp: RouteWaypoint) => {
+        let best = -1
+        let bd = Infinity
+        for (let i = 0; i < flat.length; i++) {
+          const dx = flat[i][0] - wp.lon
+          const dy = flat[i][1] - wp.lat
+          const d = dx * dx + dy * dy
+          if (d < bd) {
+            bd = d
+            best = i
+          }
+        }
+        return best
+      }
+      let lastSid = 0
+      let firstStar = flat.length - 1
       if (route.waypoints.length) {
-        for (let i = 0; i < flat.length && head < 0; i++) {
-          if (route.waypoints.some((wp) => eq(flat[i], wp))) head = i
-        }
-        for (let i = flat.length - 1; i >= 0 && tail < 0; i--) {
-          if (route.waypoints.some((wp) => eq(flat[i], wp))) tail = i
-        }
+        const sids = route.waypoints.filter((wp) => wp.segment === 'SID')
+        const stars = route.waypoints.filter((wp) => wp.segment === 'STAR')
+        lastSid = nearestIdx(sids.length ? sids[sids.length - 1] : route.waypoints[0])
+        firstStar = nearestIdx(stars.length ? stars[0] : route.waypoints[route.waypoints.length - 1])
       }
-      const vtx: { lon: number; lat: number; seg: string }[] = []
-      if (head >= 0 && tail >= head) {
-        for (let i = 0; i < head; i++) vtx.push({ lon: flat[i][0], lat: flat[i][1], seg: 'SID' })
-        vtx.push(...route.waypoints.map((wp) => ({ lon: wp.lon, lat: wp.lat, seg: wp.segment })))
-        for (let i = tail + 1; i < flat.length; i++)
-          vtx.push({ lon: flat[i][0], lat: flat[i][1], seg: 'STAR' })
-      } else {
-        for (const pt of flat) vtx.push({ lon: pt[0], lat: pt[1], seg: 'ENROUTE' })
-      }
+      const segAt = (i: number) => (i <= lastSid ? 'SID' : i >= firstStar ? 'STAR' : 'ENROUTE')
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       ctx.strokeStyle = 'rgba(255,255,255,0.28)'
       ctx.lineWidth = 5
       ctx.beginPath()
-      vtx.forEach((v, i) => {
-        const [x, y] = project(v.lon, v.lat)
+      flat.forEach((pt, i) => {
+        const [x, y] = project(pt[0], pt[1])
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
       })
       ctx.stroke()
       ctx.lineWidth = 2.2
-      for (let i = 0; i < vtx.length - 1; i++) {
-        const [x0, y0] = project(vtx[i].lon, vtx[i].lat)
-        const [x1, y1] = project(vtx[i + 1].lon, vtx[i + 1].lat)
-        ctx.strokeStyle = SEG_COLOR[vtx[i + 1].seg] || SEG_COLOR.ENROUTE
+      let runStart = 0
+      for (let i = 1; i <= flat.length; i++) {
+        const boundary = i === flat.length || segAt(i) !== segAt(runStart + 1)
+        if (!boundary) continue
+        ctx.strokeStyle = SEG_COLOR[segAt(runStart + 1)] || SEG_COLOR.ENROUTE
         ctx.beginPath()
-        ctx.moveTo(x0, y0)
-        ctx.lineTo(x1, y1)
+        for (let j = runStart; j < i; j++) {
+          const [x, y] = project(flat[j][0], flat[j][1])
+          j === runStart ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+        }
         ctx.stroke()
+        runStart = i - 1
       }
     } else {
       ctx.strokeStyle = 'rgba(150,185,225,0.55)'
@@ -510,7 +516,7 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
     }
 
     // flown portion — ends exactly at the aircraft for a smooth tip
-    const last = Math.max(1, Math.floor(t * (route.points.length - 1)))
+    const last = Math.max(1, indexAtFraction(route.points, t))
     const planeScr = project(cur.pos[0], cur.pos[1])
     ctx.strokeStyle = chart ? 'rgba(125,170,250,0.9)' : '#4fc3f7'
     ctx.lineWidth = chart ? 2.6 : 3

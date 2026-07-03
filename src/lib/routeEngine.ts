@@ -1,11 +1,11 @@
 import type { Airport } from '../types'
 import {
   greatCirclePoints,
-  densifyByDistance,
   distanceKm,
   bearing,
   crossTrackKm,
   splitAtAntimeridian,
+  smoothTurns,
   type LngLat,
 } from './geo'
 import { runwayFor, departurePath, arrivalPath, type RunwayInfo } from './runwayGeo'
@@ -49,7 +49,7 @@ function withRunways(
   from: Airport,
   to: Airport,
   coords: LngLat[],
-): { coords: LngLat[]; dep: RunwayInfo | null; arr: RunwayInfo | null; kept: LngLat[] } {
+): { coords: LngLat[]; dep: RunwayInfo | null; arr: RunwayInfo | null } {
   const a: LngLat = [from.lon, from.lat]
   const b: LngLat = [to.lon, to.lat]
 
@@ -58,22 +58,33 @@ function withRunways(
   while (fi < coords.length - 1 && distanceKm(a, coords[fi]) < 6) fi++
   let li = coords.length - 2
   while (li > fi && distanceKm(b, coords[li]) < 12) li--
-  if (li <= fi) return { coords, dep: null, arr: null, kept: coords }
+  if (li <= fi) return { coords, dep: null, arr: null }
 
   const dep = runwayFor(from, bearing(a, coords[fi]))
   const arr = runwayFor(to, bearing(coords[li], b))
+
+  // the sharper the course change between runway and route, the further out
+  // the joining fix must be — a departure that doubles back needs a wide turn
+  const angDiff = (x: number, y: number) => {
+    const d = Math.abs(x - y) % 360
+    return d > 180 ? 360 - d : d
+  }
+  if (dep) {
+    const need = () => 6 + (angDiff(dep.headingDeg, bearing(a, coords[fi])) / 180) * 26
+    while (fi < li - 1 && distanceKm(a, coords[fi]) < need()) fi++
+  }
+  if (arr) {
+    const need = () => 12 + (angDiff(arr.headingDeg, bearing(coords[li], b)) / 180) * 26
+    while (li > fi + 1 && distanceKm(b, coords[li]) < need()) li--
+  }
+  if (li <= fi) return { coords, dep: null, arr: null }
   const inner = coords.slice(fi, li + 1)
   const out: LngLat[] = [
     ...(dep ? departurePath(dep, coords[fi]) : [a]),
     ...inner,
     ...(arr ? arrivalPath(arr, coords[li]) : [b]),
   ]
-  return { coords: out, dep, arr, kept: inner }
-}
-
-/** sample density: ~350 m spacing so the roll stays exactly on the centreline */
-function sampleCount(routeKm: number): number {
-  return Math.min(6000, Math.max(900, Math.round(routeKm / 0.35)))
+  return { coords: out, dep, arr }
 }
 
 function buildRoute(
@@ -84,15 +95,24 @@ function buildRoute(
   source: 'real' | 'great-circle',
 ): Route {
   const gcKm = distanceKm([from.lon, from.lat], [to.lon, to.lat])
-  const { coords, dep, arr, kept } = withRunways(from, to, path)
-  // waypoints trimmed out of the geometry (close-in airport fixes) must also
-  // leave the chart, or the planned line would double back to them
-  const keptKeys = new Set(kept.map((c) => `${c[0]},${c[1]}`))
-  const keptWaypoints = waypoints.filter((w) => keptKeys.has(`${w.lon},${w.lat}`))
+  // fly-by turns first: real aircraft start turning before the waypoint, and
+  // the runway blends then attach tangentially to the already-smooth path
+  const built = withRunways(from, to, smoothTurns(path))
+  // second pass rounds the roll-out/route junctions; straight stretches
+  // (runway, final) and existing arcs are below the threshold and untouched
+  const coords = smoothTurns(built.coords)
+  const { dep, arr } = built
+  // waypoints hugging the airports are trimmed from the geometry; drop them
+  // from the chart too, or the planned line would point at ghost fixes
+  const keptWaypoints = waypoints.filter(
+    (w) =>
+      distanceKm([from.lon, from.lat], [w.lon, w.lat]) >= 6 &&
+      distanceKm([to.lon, to.lat], [w.lon, w.lat]) >= 12,
+  )
   return {
     from,
     to,
-    points: densifyByDistance(coords, sampleCount(gcKm)),
+    points: coords,
     segments: splitAtAntimeridian(coords),
     waypoints: keptWaypoints,
     distanceKm: gcKm,

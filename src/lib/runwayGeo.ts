@@ -112,38 +112,71 @@ export function runwayFor(airport: Airport, courseDeg: number): RunwayInfo | nul
 }
 
 /**
- * Smooth turn between a runway-aligned point and the route, as a quadratic
- * Bézier whose runway-side tangent equals the runway heading. Degrees-space
- * interpolation is fine over the ~10–20 km these blends span.
+ * Turn-then-straight join, the way a real aircraft flies it: bank into a
+ * constant-radius arc until the heading points at the target, then roll out
+ * and fly straight. No overshoot, bounded curvature. Returns the arc samples
+ * (the straight leg to `to` is implicit). Empty result = target unreachable
+ * with this radius (caller keeps a direct join).
  */
-function blend(from: LngLat, to: LngLat, headingDeg: number, mode: 'out' | 'in'): LngLat[] {
-  const gapM = distanceKm(from, to) * 1000
-  // never longer than ~60% of the gap, or the curve overshoots its target
-  const l = Math.min(6000, Math.max(Math.min(1200, gapM * 0.6), gapM * 0.4))
-  const ctrl = mode === 'out' ? offsetM(from, headingDeg, l) : offsetM(to, headingDeg + 180, l)
-  // unwrap longitudes around `from` so routes near the antimeridian stay local
-  const un = (lon: number) => {
-    let d = lon - from[0]
-    if (d > 180) d -= 360
-    if (d < -180) d += 360
-    return from[0] + d
+function turnJoin(from: LngLat, fromDirDeg: number, to: LngLat, radiusKm: number): LngLat[] {
+  const mLat = 110.54
+  const mLon = Math.max(1e-6, 111.32 * Math.cos((from[1] * Math.PI) / 180))
+  let dLon = to[0] - from[0]
+  if (dLon > 180) dLon -= 360
+  if (dLon < -180) dLon += 360
+  const tx = dLon * mLon
+  const ty = (to[1] - from[1]) * mLat
+  const h = (fromDirDeg * Math.PI) / 180
+  const ux = Math.sin(h)
+  const uy = Math.cos(h)
+  const sidePref = ux * ty - uy * tx >= 0 ? 1 : -1 // turn towards the target
+
+  for (const side of [sidePref, -sidePref]) {
+    // circle centre perpendicular to the current heading
+    const cx = -uy * side * radiusKm
+    const cy = ux * side * radiusKm
+    const dx = tx - cx
+    const dy = ty - cy
+    const d = Math.hypot(dx, dy)
+    if (d <= radiusKm * 1.02) continue // target inside the turn circle
+    const beta = Math.atan2(dy, dx)
+    const gamma = Math.acos(radiusKm / d)
+    for (const cand of [beta + gamma, beta - gamma]) {
+      // roll-out point on the circle + its tangent direction for this side
+      const qx = cx + radiusKm * Math.cos(cand)
+      const qy = cy + radiusKm * Math.sin(cand)
+      const tanX = side === 1 ? -Math.sin(cand) : Math.sin(cand)
+      const tanY = side === 1 ? Math.cos(cand) : -Math.cos(cand)
+      const gx = tx - qx
+      const gy = ty - qy
+      const gl = Math.hypot(gx, gy)
+      if (gl < 1e-6 || (tanX * gx + tanY * gy) / gl < 0.999) continue
+      const theta0 = Math.atan2(-cy, -cx)
+      let sweep = side === 1 ? cand - theta0 : theta0 - cand
+      sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+      const steps = Math.max(2, Math.ceil((sweep * 180) / Math.PI / 6))
+      const pts: LngLat[] = []
+      for (let k = 1; k <= steps; k++) {
+        const th = theta0 + side * (sweep * k) / steps
+        const x = cx + radiusKm * Math.cos(th)
+        const y = cy + radiusKm * Math.sin(th)
+        let lon = from[0] + x / mLon
+        if (lon > 180) lon -= 360
+        if (lon < -180) lon += 360
+        pts.push([lon, from[1] + y / mLat])
+      }
+      return pts
+    }
   }
-  const cx = un(ctrl[0])
-  const tx = un(to[0])
-  const pts: LngLat[] = []
-  const steps = 10
-  for (let i = 1; i <= steps; i++) {
-    const t = i / (steps + 1)
-    const a = 1 - t
-    pts.push([
-      wrapLon(a * a * from[0] + 2 * a * t * cx + t * t * tx),
-      a * a * from[1] + 2 * a * t * ctrl[1] + t * t * to[1],
-    ])
-  }
-  return pts
+  return []
 }
 
-/** threshold → ground roll → straight initial climb → turn towards the route */
+/** course between two nearby points, degrees */
+function courseBetween(a: LngLat, b: LngLat): number {
+  return bearing(a, b)
+}
+
+/** threshold → ground roll → straight initial climb → banked turn onto the route */
 export function departurePath(rw: RunwayInfo, firstFix: LngLat): LngLat[] {
   const pts: LngLat[] = []
   for (let i = 0; i <= 4; i++) {
@@ -152,16 +185,19 @@ export function departurePath(rw: RunwayInfo, firstFix: LngLat): LngLat[] {
   // climb straight ahead past the runway end before any turn (like a real SID)
   const climbEnd = offsetM(rw.end, rw.headingDeg, 2800)
   pts.push(climbEnd)
-  pts.push(...blend(climbEnd, firstFix, rw.headingDeg, 'out'))
+  pts.push(...turnJoin(climbEnd, rw.headingDeg, firstFix, 3))
   return pts
 }
 
-/** turn onto a long straight final → threshold → roll out on the strip */
+/** banked turn onto a long straight final → threshold → roll out on the strip */
 export function arrivalPath(rw: RunwayInfo, lastFix: LngLat): LngLat[] {
   const approach = (rw.headingDeg + 180) % 360
   const finalStart = offsetM(rw.threshold, approach, 9000) // ~9 km final
   const pts: LngLat[] = []
-  pts.push(...blend(lastFix, finalStart, rw.headingDeg, 'in'))
+  // construct the turn backwards from the final: leaving finalStart on the
+  // reciprocal heading and joining lastFix, then reverse — so the aircraft
+  // arrives at the final exactly runway-aligned
+  pts.push(...turnJoin(finalStart, approach, lastFix, 2.5).reverse())
   pts.push(finalStart)
   pts.push(offsetM(rw.threshold, approach, 4500))
   pts.push(offsetM(rw.threshold, approach, 1500))
