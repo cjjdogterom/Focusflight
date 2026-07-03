@@ -44,7 +44,16 @@ export default function App() {
   }
 
   return (
-    <div className="h-full w-full overflow-hidden">
+    // standalone PWA draws under the iOS status bar / home indicator; pad the
+    // regular screens with the safe-area insets, but keep the flight map
+    // full-bleed (its overlays carry their own insets)
+    <div
+      className={`h-full w-full overflow-hidden ${
+        screen === 'flying'
+          ? ''
+          : 'pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
+      }`}
+    >
       {screen === 'onboarding' && <Onboarding />}
       {screen === 'home' && <Home />}
       {screen === 'booking' && <Booking />}

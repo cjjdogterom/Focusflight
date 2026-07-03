@@ -59,6 +59,7 @@ export default function ActiveFlight() {
   const setMapStyle = useStore((s) => s.setMapStyle)
   const followPref = useStore((s) => s.followPref)
   const setFollowPref = useStore((s) => s.setFollowPref)
+  const persistFlightClock = useStore((s) => s.persistFlightClock)
   const fs = useFullscreen()
 
   const mapRef = useRef<FlightCanvasHandle>(null)
@@ -74,6 +75,9 @@ export default function ActiveFlight() {
   const gearUpRef = useRef(false)
   const gearDownRef = useRef(false)
   const soundOnRef = useRef(true)
+  // wall-clock fallback for persisting the clock before the first rAF frame
+  const initElapsedRef = useRef(0)
+  const mountWallRef = useRef(0)
 
   const aircraft = aircraftById(active.aircraftId)
   const livery = liveryById(active.liveryId)
@@ -92,7 +96,8 @@ export default function ActiveFlight() {
   const [remaining, setRemaining] = useState(duration)
   const [phase, setPhase] = useState<string>('roll')
   const [pct, setPct] = useState(0)
-  const [paused, setPaused] = useState(false)
+  const [paused, setPaused] = useState(!!active.resume?.paused)
+  const [offline, setOffline] = useState(!navigator.onLine)
   const [pure, setPure] = useState(false)
   const [soundPanel, setSoundPanel] = useState(false)
   const [squawkOpen, setSquawkOpen] = useState(false)
@@ -113,22 +118,45 @@ export default function ActiveFlight() {
   }, [active.route])
 
   useEffect(() => {
+    // restored after a reload/offline period: pick the clock up where the
+    // wall-time anchor says it is (0 for a freshly boarded flight)
+    const initialElapsedMs = Math.min(duration * 1000, active.resume?.elapsedMs ?? 0)
+    const initialSec = initialElapsedMs / 1000
+    initElapsedRef.current = initialElapsedMs
+    mountWallRef.current = Date.now()
     startRef.current = 0
     pausedAccum.current = 0
     pauseStart.current = 0
-    pausedRef.current = false
+    pausedRef.current = !!active.resume?.paused
     lastRemain.current = -1
     lastTel.current = -1
     doneRef.current = false
     gearUpRef.current = false
     gearDownRef.current = false
-    setPaused(false)
-    setRemaining(duration)
-    setPct(0)
-    setPhase('roll')
+    setPaused(pausedRef.current)
+    setRemaining(Math.max(0, Math.ceil(duration - initialSec)))
+    setPct(Math.min(100, (initialSec / duration) * 100))
+    setPhase(phaseAt(initialSec, duration, profile))
 
     const tick = (now: number) => {
-      if (startRef.current === 0) startRef.current = now
+      if (startRef.current === 0) {
+        startRef.current = now - initialElapsedMs
+        if (pausedRef.current) {
+          // restored in paused state: the running branch below won't execute,
+          // so place the plane and telemetry at the frozen position once
+          pauseStart.current = now
+          const tSec = Math.min(duration, initialElapsedMs / 1000)
+          const distFrac = profile.distFrac(tSec)
+          const dyn = profile.telemetry(tSec)
+          mapRef.current?.update(distFrac, dyn.altitudeM)
+          setTel({
+            speedKmh: dyn.speedKmh,
+            altitudeM: dyn.altitudeM,
+            heading: Math.round(positionAt(active.route.points, distFrac).heading),
+            dtgKm: Math.max(0, routeKm * (1 - distFrac)),
+          })
+        }
+      }
       if (!pausedRef.current) {
         const elapsedMs = now - startRef.current - pausedAccum.current
         const tSec = Math.min(duration, elapsedMs / 1000)
@@ -178,7 +206,9 @@ export default function ActiveFlight() {
               })
             } catch { /* notification optional */ }
           }
-          void finishFlight(duration, 1)
+          // back-compute the real touchdown wall time: a throttled/hidden tab
+          // can detect the landing long after it actually happened
+          void finishFlight(duration, 1, Date.now() - Math.max(0, elapsedMs - duration * 1000))
           return
         }
       }
@@ -192,6 +222,17 @@ export default function ActiveFlight() {
   useEffect(() => {
     soundOnRef.current = soundOn
   }, [soundOn])
+
+  useEffect(() => {
+    const on = () => setOffline(false)
+    const off = () => setOffline(true)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
 
   useEffect(() => {
     if (soundOn) startAmbience(soundscape, 0.5)
@@ -235,8 +276,18 @@ export default function ActiveFlight() {
     const next = !paused
     setPaused(next)
     pausedRef.current = next
-    if (next) pauseStart.current = performance.now()
-    else pausedAccum.current += performance.now() - pauseStart.current
+    const now = performance.now()
+    if (next) pauseStart.current = now
+    else if (pauseStart.current !== 0) pausedAccum.current += now - pauseStart.current
+    // anchor the clock in wall time so a reload/offline period resumes right;
+    // before the first rAF frame (throttled tab) fall back to the wall clock
+    const elapsedMs =
+      startRef.current !== 0
+        ? Math.max(0, now - startRef.current - pausedAccum.current)
+        : next
+          ? initElapsedRef.current + (Date.now() - mountWallRef.current)
+          : initElapsedRef.current
+    persistFlightClock(Math.min(elapsedMs, duration * 1000), !next)
   }
 
   const submitSquawk = () => {
@@ -260,9 +311,10 @@ export default function ActiveFlight() {
     if (pausedRef.current) {
       setPaused(false)
       pausedRef.current = false
-      pausedAccum.current += performance.now() - pauseStart.current
+      if (pauseStart.current !== 0) pausedAccum.current += performance.now() - pauseStart.current
     }
     startRef.current = performance.now() - targetSec * 1000 - pausedAccum.current
+    persistFlightClock(targetSec * 1000, true)
   }
 
   return (
@@ -290,7 +342,7 @@ export default function ActiveFlight() {
       {!pure && (
         <>
           {/* minimal flight info, no box */}
-          <div className="absolute top-0 left-0 p-5 animate-fade-in pointer-events-none [text-shadow:0_1px_8px_rgba(0,0,0,0.7)]">
+          <div className="absolute top-0 left-0 p-5 pt-[calc(1.25rem+env(safe-area-inset-top))] animate-fade-in pointer-events-none [text-shadow:0_1px_8px_rgba(0,0,0,0.7)]">
             <p className="font-semibold text-[15px]">
               {active.route.from.iata} → {active.route.to.iata}
               <span className="text-white/55 font-normal">
@@ -308,10 +360,15 @@ export default function ActiveFlight() {
               {tel.speedKmh} km/u · {tel.altitudeM.toLocaleString('nl-NL')} m ·{' '}
               {String(tel.heading).padStart(3, '0')}°
             </p>
+            {offline && (
+              <p className="text-[11px] font-semibold text-amber-300/90 mt-1">
+                Offline — je vlucht loopt gewoon door
+              </p>
+            )}
           </div>
 
           {/* iOS map buttons */}
-          <div className="absolute top-0 right-0 p-4 flex flex-col gap-2.5 animate-fade-in">
+          <div className="absolute top-0 right-0 p-4 pt-[calc(1rem+env(safe-area-inset-top))] flex flex-col gap-2.5 animate-fade-in">
             <button
               className={`ios-btn ${mapStyle === 'sat' ? 'ios-btn--active' : ''}`}
               aria-label="Satellietbeeld"
@@ -375,7 +432,7 @@ export default function ActiveFlight() {
           {squawkOpen && (
             <div
               className="absolute right-[70px] max-w-[calc(100vw-90px)] z-20 w-64 glass rounded-2xl p-3 animate-fade-in"
-              style={{ top: fs.supported ? 288 : 232 }}
+              style={{ top: `calc(${fs.supported ? 288 : 232}px + env(safe-area-inset-top, 0px))` }}
             >
               <p className="avlabel uppercase tracking-[0.12em] mb-2">Squawk — parkeer je gedachte</p>
               <input
@@ -395,7 +452,7 @@ export default function ActiveFlight() {
           {soundPanel && (
             <div
               className="absolute right-[70px] max-w-[calc(100vw-90px)] z-20 w-60 glass rounded-2xl overflow-hidden animate-fade-in"
-              style={{ top: fs.supported ? 234 : 178 }}
+              style={{ top: `calc(${fs.supported ? 234 : 178}px + env(safe-area-inset-top, 0px))` }}
             >
               <p className="avlabel uppercase tracking-[0.12em] px-4 pt-3 pb-1.5">Geluid aan boord</p>
               <div className="divide-y divide-white/[0.06]">
@@ -421,7 +478,7 @@ export default function ActiveFlight() {
           )}
 
           {/* big-type HUD (reference style) */}
-          <div className="absolute bottom-0 inset-x-0 px-6 pb-6 pt-2 animate-fade-in [text-shadow:0_2px_12px_rgba(0,0,0,0.8)]">
+          <div className="absolute bottom-0 inset-x-0 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 animate-fade-in [text-shadow:0_2px_12px_rgba(0,0,0,0.8)]">
             <div className="flex items-end justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[12px] sm:text-[14px] text-white/60 font-medium whitespace-nowrap">

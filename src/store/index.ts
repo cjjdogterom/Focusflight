@@ -12,10 +12,15 @@ import type { SoundscapeId } from '../lib/audio'
 import {
   allFlights,
   deleteFlight,
+  getFlightById,
   getSetting,
+  loadActiveFlight,
+  patchActiveFlight,
+  saveActiveFlight,
   saveFlight,
   setSetting,
 } from '../lib/persistence'
+import { acquireFlightLock, hasFlightLock } from '../lib/flightLock'
 
 export type Screen =
   | 'onboarding'
@@ -55,6 +60,8 @@ export interface ActiveFlight {
   seat: string
   gate: string
   flightNo: string
+  /** set when a persisted flight is restored after a reload — initial timer state */
+  resume?: { elapsedMs: number; paused: boolean }
 }
 
 interface State {
@@ -101,8 +108,10 @@ interface State {
   pickRandomDestination: () => void
   startBoarding: () => void
   beginFlight: () => Promise<void>
-  finishFlight: (completedSec: number, fraction: number) => Promise<void>
+  finishFlight: (completedSec: number, fraction: number, endedAtMs?: number) => Promise<void>
   abortFlight: (completedSec: number, fraction: number) => Promise<void>
+  /** anchor the flight clock in wall time so it survives reload/offline */
+  persistFlightClock: (elapsedMs: number, running: boolean) => void
   removeFlight: (id: string) => Promise<void>
   addSquawk: (text: string) => void
   /** effective departure: booking override, else transit position / home */
@@ -162,8 +171,22 @@ export const useStore = create<State>((set, get) => ({
     const transitMode = await getSetting<boolean>('transitMode', false)
     const flights = await allFlights()
     const totalMiles = flights.reduce((sum, f) => sum + f.miles, 0)
+
+    // resume a flight that was in the air when the app was last closed —
+    // the wall-clock anchor keeps it ticking through reloads and offline time.
+    // Only the tab that wins the flight lock restores it; a second window
+    // opens at Home instead of forking the same flight.
+    const rec = await loadActiveFlight()
+    const owned = rec?.active ? await acquireFlightLock() : false
+    const a = owned ? ((rec!.active as ActiveFlight | undefined) ?? null) : null
+    const c = rec?.clock
+    const elapsedMs =
+      a && c ? (c.running ? c.elapsedMs + Math.max(0, Date.now() - c.wallMs) : c.elapsedMs) : 0
+    const landedAway = a != null && elapsedMs >= a.durationSec * 1000
+    const inAir = a != null && !landedAway
+
     set({
-      ready: true,
+      ready: !landedAway, // auto-land below flips it after the log is written
       homeIata,
       soundOn,
       soundscape,
@@ -173,8 +196,23 @@ export const useStore = create<State>((set, get) => ({
       transitMode,
       flights,
       totalMiles,
-      screen: homeIata ? 'home' : 'onboarding',
+      ...(inAir
+        ? {
+            active: { ...a, resume: { elapsedMs, paused: !c!.running } },
+            activeSquawks: rec!.squawks,
+            screen: 'flying' as Screen,
+          }
+        : { screen: (homeIata ? 'home' : 'onboarding') as Screen }),
     })
+
+    if (landedAway) {
+      // landed while the app was away — log the completed flight and greet
+      // the user with the landing screen
+      const endedAt = c!.running ? c!.wallMs + (a.durationSec * 1000 - c!.elapsedMs) : Date.now()
+      set({ active: a, activeSquawks: rec!.squawks })
+      await get().finishFlight(a.durationSec, 1, endedAt)
+      set({ ready: true })
+    }
   },
 
   setScreen: (screen) => set({ screen }),
@@ -228,6 +266,12 @@ export const useStore = create<State>((set, get) => ({
     const t = text.trim()
     if (!t) return
     set((s) => ({ activeSquawks: [...s.activeSquawks, t].slice(0, 20) }))
+    if (get().active && hasFlightLock()) void patchActiveFlight({ squawks: get().activeSquawks })
+  },
+
+  persistFlightClock: (elapsedMs, running) => {
+    if (!hasFlightLock()) return
+    void patchActiveFlight({ clock: { elapsedMs, running, wallMs: Date.now() } })
   },
 
   updateBooking: (patch) => set((s) => ({ booking: { ...s.booking, ...patch } })),
@@ -271,9 +315,18 @@ export const useStore = create<State>((set, get) => ({
       flightNo: info.flightNo,
     }
     set({ active, screen: 'flying', activeSquawks: [] })
+    // persist only when this tab owns the flight lock — never hijack a
+    // flight that is still running in another window
+    if (await acquireFlightLock()) {
+      void saveActiveFlight({
+        active,
+        squawks: [],
+        clock: { elapsedMs: 0, running: true, wallMs: active.startedAtMs },
+      })
+    }
   },
 
-  finishFlight: async (completedSec, fraction) => {
+  finishFlight: async (completedSec, fraction, endedAtMs) => {
     const { active, activeSquawks } = get()
     if (!active) return
     const miles = milesFor(active.route.distanceKm, fraction)
@@ -292,21 +345,27 @@ export const useStore = create<State>((set, get) => ({
       miles,
       completed: true,
       startedAt: active.startedAtMs,
-      endedAt: Date.now(),
+      endedAt: endedAtMs ?? Date.now(),
       squawks: activeSquawks.length ? activeSquawks : undefined,
     }
     await saveFlight(entry)
+    if (hasFlightLock()) await saveActiveFlight(null)
     set((s) => {
-      const earned = newlyUnlocked(s.totalMiles, s.totalMiles + miles)
-      const flights = [entry, ...s.flights]
+      // dedupe by id: a stale persisted record could auto-land a flight
+      // that is already in the log — never double-count it
+      const rest = s.flights.filter((f) => f.id !== entry.id)
+      const prevTotal = rest.reduce((sum, f) => sum + f.miles, 0)
+      const flights = [entry, ...rest]
+      const totalMiles = prevTotal + miles
+      const earned = newlyUnlocked(prevTotal, totalMiles)
       // new passport stamp: first completed landing in this country?
-      const before = new Set(deriveStamps(s.flights).map((st) => st.country))
+      const before = new Set(deriveStamps(rest).map((st) => st.country))
       const stamp = deriveStamps(flights).find((st) => !before.has(st.country))
       const certs = certificatesEarnedAt(flights, entry.endedAt)
       return {
         lastResult: entry,
         flights,
-        totalMiles: s.totalMiles + miles,
+        totalMiles,
         newCardId: earned.length ? earned[earned.length - 1].id : null,
         newStamp: stamp?.country ?? null,
         newCertIds: certs.map((c) => c.id),
@@ -327,6 +386,14 @@ export const useStore = create<State>((set, get) => ({
   abortFlight: async (completedSec, fraction) => {
     const { active, activeSquawks } = get()
     if (!active) return
+    // if this flight already landed (e.g. finished in another window), never
+    // downgrade the completed log entry to a diverted one
+    const existing = await getFlightById(`${active.startedAtMs}`)
+    if (existing?.completed) {
+      if (hasFlightLock()) await saveActiveFlight(null)
+      set({ active: null, screen: 'home' })
+      return
+    }
     const miles = milesFor(active.route.distanceKm, fraction * 0.5) // half credit for a diverted flight
     const entry: FlightLogEntry = {
       id: `${active.startedAtMs}`,
@@ -347,13 +414,17 @@ export const useStore = create<State>((set, get) => ({
       squawks: activeSquawks.length ? activeSquawks : undefined,
     }
     await saveFlight(entry)
-    set((s) => ({
-      lastResult: entry,
-      flights: [entry, ...s.flights],
-      totalMiles: s.totalMiles + miles,
-      active: null,
-      screen: 'home',
-    }))
+    if (hasFlightLock()) await saveActiveFlight(null)
+    set((s) => {
+      const rest = s.flights.filter((f) => f.id !== entry.id)
+      return {
+        lastResult: entry,
+        flights: [entry, ...rest],
+        totalMiles: rest.reduce((sum, f) => sum + f.miles, 0) + miles,
+        active: null,
+        screen: 'home',
+      }
+    })
   },
 }))
 
