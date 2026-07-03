@@ -75,6 +75,9 @@ export default function FlightLog() {
             <IconBack size={19} />
           </button>
           <h1 className="text-xl font-bold flex-1">Pilotenlogboek</h1>
+          <button className="btn-ghost text-sm py-2 px-3" onClick={() => setScreen('trends')}>
+            Trends
+          </button>
           {flights.length > 0 && (
             <button className="btn-ghost text-sm py-2 px-3" onClick={exportCSV}>
               CSV

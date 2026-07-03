@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
-import { airportByIata, searchAirports } from '../data/airports'
+import { AIRPORTS, airportByIata, searchAirports } from '../data/airports'
 import { STANDARD } from '../data/aircraft'
 import { IconPlane, IconBack } from '../components/icons'
 import { distanceKm } from '../lib/geo'
@@ -23,6 +23,22 @@ export default function Booking() {
   const startBoarding = useStore((s) => s.startBoarding)
 
   const [pickingDest, setPickingDest] = useState(false)
+  const [targetMin, setTargetMin] = useState(45)
+
+  // airports whose real flight time matches the focus duration you want
+  const suggestions = useMemo(() => {
+    if (!home) return []
+    const rows: { a: Airport; min: number; diff: number; big: boolean }[] = []
+    for (const a of AIRPORTS as (Airport & { big?: boolean })[]) {
+      if (a.iata === home.iata) continue
+      const d = distanceKm([home.lon, home.lat], [a.lon, a.lat])
+      const min = flightMinutes(d, STANDARD)
+      const diff = Math.abs(min - targetMin)
+      if (diff <= 6) rows.push({ a, min, diff, big: !!a.big })
+    }
+    rows.sort((x, y) => Number(y.big) - Number(x.big) || x.diff - y.diff)
+    return rows.slice(0, 4)
+  }, [home, targetMin])
 
   const dest = booking.destinationIata ? airportByIata(booking.destinationIata) : undefined
   const dist = home && dest ? distanceKm([home.lon, home.lat], [dest.lon, dest.lat]) : 0
@@ -81,6 +97,65 @@ export default function Booking() {
             )}
           </div>
         </button>
+
+        {/* pick by focus duration: slider + matching destinations */}
+        <section>
+          <p className="avlabel uppercase tracking-[0.12em] mb-2.5">Kies op focusduur</p>
+          <div className="card p-5">
+            <div className="flex items-baseline justify-between mb-1.5">
+              <p className="text-[26px] font-bold tracking-tight tabular-nums leading-none">
+                {formatMinutes(targetMin)}
+              </p>
+              <p className="text-[12px] text-white/45">schuif en kies een bestemming</p>
+            </div>
+            <input
+              type="range"
+              min={25}
+              max={720}
+              step={5}
+              value={targetMin}
+              onChange={(e) => setTargetMin(Number(e.target.value))}
+              className="w-full accent-white"
+              aria-label="Focusduur"
+            />
+            <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+              {suggestions.map(({ a, min }) => {
+                const active = booking.destinationIata === a.iata
+                return (
+                  <button
+                    key={a.iata}
+                    onClick={() => {
+                      update({ destinationIata: a.iata })
+                      if (home) prefetchRoute(home, a)
+                    }}
+                    className={`shrink-0 rounded-xl px-3 py-2 text-left transition active:scale-[0.97] ${
+                      active ? 'bg-white text-black' : 'bg-white/[0.07] border border-white/10'
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex items-center rounded-md font-bold text-[11px] px-1.5 py-0.5 ${
+                        active ? 'bg-black text-white' : 'bg-[#ffc800] text-[#0b0d10]'
+                      }`}
+                    >
+                      {a.iata}
+                    </span>
+                    <span className="block text-[13px] font-semibold mt-1 max-w-[7rem] truncate">
+                      {a.city}
+                    </span>
+                    <span className={`block text-[11px] ${active ? 'text-black/55' : 'text-white/45'}`}>
+                      {formatMinutes(min)}
+                    </span>
+                  </button>
+                )
+              })}
+              {suggestions.length === 0 && (
+                <p className="text-[12px] text-white/40 py-2">
+                  Geen bestemming op precies deze duur — schuif iets verder.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* aircraft photo preview — no type shown, just the plane */}
         <div className="card px-6 pt-8 pb-6 grid place-items-center overflow-hidden">

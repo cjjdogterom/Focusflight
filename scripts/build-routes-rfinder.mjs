@@ -134,6 +134,7 @@ for (const [dep, arr] of pairs) {
       }
     } else {
       fail++
+      if (fail <= 5 || fail % 50 === 0) console.log(`[${done}] ${key} -> no valid route`)
     }
   } catch (e) {
     fail++

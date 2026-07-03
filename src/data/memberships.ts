@@ -3,10 +3,24 @@
 // real aviation history and real distances (KLM's first route, Lindbergh, the
 // Uiver, the equator, a light-second, the Moon). Keep the array sorted by kmMin.
 
+export type CardFinish =
+  | 'plastic'
+  | 'ceramic'
+  | 'brushed'
+  | 'patina'
+  | 'polished'
+  | 'frosted'
+  | 'satin'
+  | 'carbon'
+  | 'iridescent'
+  | 'meteorite'
+
 export interface MembershipCard {
   id: string
   name: string
   kmMin: number
+  /** material finish — the ladder runs from cheap plastic to exotic metals */
+  finish: CardFinish
   /** metal gradient */
   from: string
   to: string
@@ -20,6 +34,7 @@ export interface MembershipCard {
 export const MEMBERSHIP_CARDS: MembershipCard[] = [
   {
     id: 'crew',
+    finish: 'plastic',
     name: 'Crew',
     kmMin: 0,
     from: '#a9bccf',
@@ -32,6 +47,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
     // KLM's very first route (Amsterdam–Croydon, 17 mei 1920), ±350 km —
     // the oldest still-operating air route in the world
     id: 'delft',
+    finish: 'ceramic',
     name: 'Delft Blue',
     kmMin: 350,
     from: '#9db8dd',
@@ -42,6 +58,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'bronze',
+    finish: 'patina',
     name: 'Patina Bronze',
     kmMin: 1000,
     from: '#cdb888',
@@ -52,6 +69,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'silver',
+    finish: 'brushed',
     name: 'Silver Wing',
     kmMin: 2500,
     from: '#e9ebef',
@@ -64,6 +82,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
     // Lindbergh's 1927 New York–Paris solo was 5.808 km; duralumin is the
     // aircraft alloy of that era
     id: 'duralumin',
+    finish: 'brushed',
     name: 'Duralumin',
     kmMin: 5800,
     from: '#ddd3c2',
@@ -74,6 +93,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'gold',
+    finish: 'polished',
     name: 'Gold Crown',
     kmMin: 10000,
     from: '#eed58a',
@@ -85,6 +105,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   {
     // KLM pioneered the polar route to Tokyo via Anchorage in 1958
     id: 'polar',
+    finish: 'frosted',
     name: 'Polar Route',
     kmMin: 15000,
     from: '#dae7ec',
@@ -97,6 +118,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
     // the Uiver ("stork") flew ±18.200 km in the 1934 London–Melbourne race
     // and won on handicap after surviving the Albury thunderstorm
     id: 'uiver',
+    finish: 'satin',
     name: 'Iron Stork',
     kmMin: 18200,
     from: '#a8b2ab',
@@ -107,6 +129,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'platinum',
+    finish: 'satin',
     name: 'Platinum',
     kmMin: 25000,
     from: '#f0f3f7',
@@ -118,6 +141,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   {
     // Earth's equatorial circumference — one full lap of the planet
     id: 'greatcircle',
+    finish: 'brushed',
     name: 'Great Circle',
     kmMin: 40075,
     from: '#a9cbb4',
@@ -128,6 +152,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'diamond',
+    finish: 'frosted',
     name: 'Diamond Sky',
     kmMin: 60000,
     from: '#d5dbff',
@@ -139,6 +164,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   {
     // fly west and the golden hour stretches with you
     id: 'goldenhour',
+    finish: 'polished',
     name: 'Golden Hour',
     kmMin: 90000,
     from: '#edccbc',
@@ -149,6 +175,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'royal',
+    finish: 'polished',
     name: 'Royal Dutch',
     kmMin: 125000,
     from: '#f3b47c',
@@ -159,6 +186,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   },
   {
     id: 'mach',
+    finish: 'carbon',
     name: 'Mach One',
     kmMin: 200000,
     from: '#d5a8a6',
@@ -170,6 +198,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
   {
     // the distance light travels in one second
     id: 'lightsecond',
+    finish: 'iridescent',
     name: 'Light Second',
     kmMin: 299792,
     from: '#c7b2c9',
@@ -182,6 +211,7 @@ export const MEMBERSHIP_CARDS: MembershipCard[] = [
     // average Earth–Moon distance; meteorite iron is the only metal that
     // actually made the trip
     id: 'lunar',
+    finish: 'meteorite',
     name: 'Lunar Distance',
     kmMin: 384400,
     from: '#bcae9d',

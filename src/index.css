@@ -147,6 +147,114 @@ body {
   mix-blend-mode: overlay;
   pointer-events: none;
 }
+/* ---- material finishes: the ladder runs from plastic to exotic metal ---- */
+/* cheap glossy plastic: no metal grain, one soft moulded highlight */
+.metal-card.finish-plastic::before {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.06) 34%, rgba(0, 0, 0, 0.05) 72%);
+  mix-blend-mode: normal;
+}
+.metal-card.finish-plastic {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.2),
+    0 10px 24px -14px rgba(0, 0, 0, 0.7);
+}
+/* glazed ceramic: wet gloss band over a smooth surface */
+.metal-card.finish-ceramic::before {
+  background:
+    radial-gradient(120% 90% at 22% 0%, rgba(255, 255, 255, 0.4) 0%, transparent 46%),
+    linear-gradient(175deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.08));
+  mix-blend-mode: normal;
+}
+/* brushed metal: long horizontal grain lines, like a real machined card */
+.metal-card.finish-brushed::before {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0 1px,
+      rgba(0, 0, 0, 0.1) 1px 2px,
+      rgba(255, 255, 255, 0.05) 2px 4px
+    ),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0 7px, rgba(0, 0, 0, 0.06) 7px 16px);
+  mix-blend-mode: overlay;
+}
+/* weathered patina: mottled oxidation blotches */
+.metal-card.finish-patina::before {
+  background:
+    radial-gradient(34% 42% at 24% 30%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(46% 38% at 72% 64%, rgba(0, 0, 0, 0.2), transparent 72%),
+    radial-gradient(24% 30% at 58% 18%, rgba(255, 255, 255, 0.1), transparent 65%),
+    radial-gradient(30% 36% at 38% 80%, rgba(0, 0, 0, 0.16), transparent 70%),
+    repeating-linear-gradient(175deg, rgba(255, 255, 255, 0.05) 0 2px, rgba(0, 0, 0, 0.05) 2px 5px);
+  mix-blend-mode: overlay;
+}
+/* mirror polish: hard bright reflection bands */
+.metal-card.finish-polished::before {
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.42) 18%,
+    rgba(0, 0, 0, 0.12) 34%,
+    rgba(255, 255, 255, 0.16) 52%,
+    rgba(0, 0, 0, 0.14) 70%,
+    rgba(255, 255, 255, 0.3) 88%
+  );
+  mix-blend-mode: overlay;
+}
+/* frosted crystal: fine icy speckle */
+.metal-card.finish-frosted::before {
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.1) 0 9deg, rgba(255, 255, 255, 0) 9deg 18deg),
+    repeating-linear-gradient(98deg, rgba(255, 255, 255, 0.09) 0 2px, rgba(0, 0, 0, 0.04) 2px 5px),
+    radial-gradient(90% 70% at 50% 0%, rgba(255, 255, 255, 0.16), transparent 60%);
+  background-size: 26px 26px, auto, auto;
+  mix-blend-mode: overlay;
+}
+/* satin steel: soft fine vertical grain, low contrast */
+.metal-card.finish-satin::before {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 1px, rgba(0, 0, 0, 0.04) 1px 3px),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.06));
+  mix-blend-mode: overlay;
+}
+/* carbon fibre: classic 2x2 twill weave */
+.metal-card.finish-carbon::before {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.09) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.09) 75%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.09) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.09) 75%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.22) 75%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.22) 75%),
+    radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, 0.1), transparent 55%);
+  background-size: 7px 7px, 7px 7px, 7px 7px, 7px 7px, auto;
+  background-position: 0 0, 3.5px 3.5px, 0 0, 3.5px 3.5px, 0 0;
+  mix-blend-mode: overlay;
+}
+/* heat-anodised iridescence: oil-slick hue drift over titanium */
+.metal-card.finish-iridescent::before {
+  background:
+    linear-gradient(
+      110deg,
+      rgba(255, 120, 120, 0.16) 0%,
+      rgba(255, 210, 120, 0.14) 18%,
+      rgba(140, 255, 170, 0.14) 38%,
+      rgba(120, 190, 255, 0.18) 58%,
+      rgba(200, 130, 255, 0.16) 78%,
+      rgba(255, 130, 170, 0.14) 100%
+    ),
+    repeating-linear-gradient(175deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.05) 1px 3px);
+  mix-blend-mode: overlay;
+}
+/* meteorite: Widmanstätten cross-hatch etched at two angles */
+.metal-card.finish-meteorite::before {
+  background:
+    repeating-linear-gradient(63deg, rgba(255, 255, 255, 0.13) 0 1.5px, transparent 1.5px 9px),
+    repeating-linear-gradient(-58deg, rgba(255, 255, 255, 0.1) 0 1.5px, transparent 1.5px 12px),
+    repeating-linear-gradient(8deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 7px),
+    radial-gradient(60% 50% at 70% 30%, rgba(0, 0, 0, 0.18), transparent 70%);
+  mix-blend-mode: overlay;
+}
+
 .metal-card::after {
   /* diagonal sheen */
   content: '';

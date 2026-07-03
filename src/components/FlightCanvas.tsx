@@ -54,7 +54,8 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
   const altRef = useRef(0)
   const followRef = useRef<FollowMode>(followMode)
   const camMode = useRef<'cine' | 'transition' | 'free'>('free')
-  const rotCur = useRef(0) // map rotation (rad), 0 = north up
+  const rotCur = useRef(0)
+  const headingCur = useRef<number | null>(null) // map rotation (rad), 0 = north up
   const anchorYF = useRef(0.5) // plane anchor as fraction of height
   const planeImg = useRef<HTMLImageElement | null>(null)
   const planeReady = useRef(false)
@@ -190,6 +191,7 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
   // cinematic takeoff: start zoomed in on the departure runway (chart flights)
   useEffect(() => {
     rotCur.current = 0
+    headingCur.current = null
     if (chart) {
       camMode.current = 'cine'
       anchorYF.current = 0.58
@@ -326,7 +328,10 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
 
     const t = distRef.current
     const cur = positionAt(route.points, t)
-    const headingRad = cur.heading * D2R
+    // extra per-frame smoothing so the nose glides through turns
+    if (headingCur.current === null) headingCur.current = cur.heading * D2R
+    headingCur.current += shortestAngle(headingCur.current, cur.heading * D2R) * 0.14
+    const headingRad = headingCur.current
 
     // ---- camera logic ----
     const mode = camMode.current
@@ -656,7 +661,7 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
 
     // aircraft (3D; heading relative to the rotated map)
     const [px, py] = planeScr
-    const screenHeading = cur.heading + rotCur.current / D2R
+    const screenHeading = headingRad / D2R + rotCur.current / D2R
     if (photoReady.current && photoImg.current) {
       const im = photoImg.current
       const ph = planePx * 1.15

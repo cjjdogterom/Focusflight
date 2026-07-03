@@ -9,7 +9,7 @@ import { aircraftById } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
 import { buildProfile, type FlightProfile } from '../lib/profile'
 import { positionAt } from '../lib/geo'
-import { startAmbience, stopAmbience, SOUNDSCAPES } from '../lib/audio'
+import { startAmbience, stopAmbience, playGear, SOUNDSCAPES } from '../lib/audio'
 import runwaysData from '../data/runways.json'
 
 const RUNWAYS = runwaysData as unknown as Record<string, { lengthM: number; ident: string }>
@@ -66,6 +66,9 @@ export default function ActiveFlight() {
   const lastTel = useRef<number>(-1)
   const wakeRef = useRef<WakeLockSentinel | null>(null)
   const doneRef = useRef<boolean>(false)
+  const gearUpRef = useRef(false)
+  const gearDownRef = useRef(false)
+  const soundOnRef = useRef(true)
 
   const aircraft = aircraftById(active.aircraftId)
   const livery = liveryById(active.liveryId)
@@ -110,6 +113,8 @@ export default function ActiveFlight() {
     lastRemain.current = -1
     lastTel.current = -1
     doneRef.current = false
+    gearUpRef.current = false
+    gearDownRef.current = false
     setPaused(false)
     setRemaining(duration)
     setPct(0)
@@ -123,6 +128,18 @@ export default function ActiveFlight() {
         const distFrac = profile.distFrac(tSec)
         const dyn = profile.telemetry(tSec)
         mapRef.current?.update(distFrac, dyn.altitudeM)
+
+        // landing gear: retract passing ~90 m in the climb, extend passing
+        // ~480 m on final — phase-based so throttled tabs can't miss it
+        if (!gearUpRef.current && tSec < duration * 0.3 && dyn.altitudeM > 90) {
+          gearUpRef.current = true
+          if (soundOnRef.current) playGear('up')
+        }
+        if (!gearDownRef.current && tSec > duration * 0.5 && dyn.altitudeM < 480) {
+          gearDownRef.current = true
+          // only audible while still airborne (skip straight to touchdown = silent)
+          if (dyn.altitudeM > 0 && soundOnRef.current) playGear('down')
+        }
 
         const remain = Math.max(0, Math.ceil(duration - tSec))
         if (remain !== lastRemain.current) {
@@ -164,6 +181,10 @@ export default function ActiveFlight() {
     return () => cancelAnimationFrame(rafRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.startedAtMs])
+
+  useEffect(() => {
+    soundOnRef.current = soundOn
+  }, [soundOn])
 
   useEffect(() => {
     if (soundOn) startAmbience(soundscape, 0.5)

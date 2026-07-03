@@ -116,7 +116,7 @@ export default function Collection() {
 export function Card({ card, large = false }: { card: MembershipCard; large?: boolean }) {
   return (
     <div
-      className={`metal-card ${large ? 'aspect-[1.62]' : 'aspect-[1.58]'}`}
+      className={`metal-card finish-${card.finish} ${large ? 'aspect-[1.62]' : 'aspect-[1.58]'}`}
       style={{
         background: `linear-gradient(150deg, ${card.from} 0%, ${card.to} 100%)`,
         color: card.text,

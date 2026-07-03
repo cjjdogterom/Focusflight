@@ -11,6 +11,7 @@ import FlightLog from './screens/FlightLog'
 import Collection from './screens/Collection'
 import Settings from './screens/Settings'
 import Passport from './screens/Passport'
+import Trends from './screens/Trends'
 
 export default function App() {
   const ready = useStore((s) => s.ready)
@@ -42,6 +43,7 @@ export default function App() {
       {screen === 'collection' && <Collection />}
       {screen === 'settings' && <Settings />}
       {screen === 'passport' && <Passport />}
+      {screen === 'trends' && <Trends />}
     </div>
   )
 }

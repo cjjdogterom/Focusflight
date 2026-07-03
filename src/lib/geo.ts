@@ -104,6 +104,15 @@ export function positionAt(points: LngLat[], t: number): { pos: LngLat; heading:
   while (i < points.length - 2 && cum[i + 1] < target) i++
   const segLen = cum[i + 1] - cum[i]
   const frac = segLen > 0 ? (target - cum[i]) / segLen : 0
+  // heading from a short LOOKAHEAD along the path instead of the raw segment
+  // bearing, so the nose sweeps continuously through fly-by turns instead of
+  // ticking from segment to segment
+  const lookKm = Math.min(1.5, Math.max(0.2, total * 0.0008))
+  const t2 = Math.min(total, target + lookKm)
+  let j = i
+  while (j < points.length - 2 && cum[j + 1] < t2) j++
+  const segLen2 = cum[j + 1] - cum[j]
+  const frac2 = segLen2 > 0 ? (t2 - cum[j]) / segLen2 : 0
   const p0 = points[i]
   const p1 = points[i + 1]
   // Handle antimeridian wrap when interpolating longitude
@@ -117,7 +126,23 @@ export function positionAt(points: LngLat[], t: number): { pos: LngLat; heading:
   if (lon > 180) lon -= 360
   if (lon < -180) lon += 360
   const lat = p0[1] + (p1[1] - p0[1]) * frac
-  return { pos: [lon, lat], heading: bearing(p0, p1) }
+
+  const q0 = points[j]
+  const q1 = points[j + 1]
+  let qlon0 = q0[0]
+  let qlon1 = q1[0]
+  if (Math.abs(qlon1 - qlon0) > 180) {
+    if (qlon1 > qlon0) qlon0 += 360
+    else qlon1 += 360
+  }
+  let lon2 = qlon0 + (qlon1 - qlon0) * frac2
+  if (lon2 > 180) lon2 -= 360
+  if (lon2 < -180) lon2 += 360
+  const lat2 = q0[1] + (q1[1] - q0[1]) * frac2
+  const pos: LngLat = [lon, lat]
+  const ahead: LngLat = [lon2, lat2]
+  const far = Math.abs(lon2 - lon) > 1e-9 || Math.abs(lat2 - lat) > 1e-9
+  return { pos, heading: far ? bearing(pos, ahead) : bearing(p0, p1) }
 }
 
 /**

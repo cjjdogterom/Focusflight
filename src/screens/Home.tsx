@@ -71,13 +71,17 @@ export default function Home() {
           <Card card={card} large />
         </button>
 
-        {/* stats row — no boxes, just dividers */}
-        <div className="grid grid-cols-4 divide-x divide-white/10 text-center py-1">
+        {/* stats row — tap for trends */}
+        <button
+          onClick={() => setScreen('trends')}
+          className="grid grid-cols-4 divide-x divide-white/10 text-center py-1 active:opacity-70 transition-opacity"
+          aria-label="Bekijk trends"
+        >
           <Stat label="Vandaag" value={formatDuration(todayFocus)} />
           <Stat label="Kilometers" value={totalMiles.toLocaleString('nl-NL')} />
           <Stat label="Vluchten" value={String(completedCount)} />
           <Stat label="Streak" value={`${streak}d`} />
-        </div>
+        </button>
 
         {/* primary CTA */}
         <div className="flex flex-col gap-2.5">

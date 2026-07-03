@@ -283,3 +283,101 @@ export function setVolume(v: number) {
     master.gain.setTargetAtTime(v, ctx.currentTime, 0.1)
   }
 }
+
+/**
+ * One-shot landing-gear sound: hydraulic pump whine that shifts pitch under
+ * load, a burst of airflow while the doors are open, and the locking CLUNK
+ * at the end. Fully synthesised; independent of the ambience context.
+ */
+export function playGear(direction: 'up' | 'down') {
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  const c = new AC()
+  const out = c.createGain()
+  out.gain.value = 0.5
+  out.connect(c.destination)
+  const t = c.currentTime
+  const dur = direction === 'up' ? 2.6 : 3.0
+
+  // hydraulic pump: sawtooth through a resonant lowpass, pitch sags under load
+  const pump = c.createOscillator()
+  pump.type = 'sawtooth'
+  pump.frequency.setValueAtTime(direction === 'up' ? 92 : 74, t)
+  pump.frequency.linearRampToValueAtTime(direction === 'up' ? 68 : 96, t + dur * 0.8)
+  const pumpLp = c.createBiquadFilter()
+  pumpLp.type = 'lowpass'
+  pumpLp.frequency.value = 320
+  pumpLp.Q.value = 3
+  const pumpG = c.createGain()
+  pumpG.gain.setValueAtTime(0.0001, t)
+  pumpG.gain.exponentialRampToValueAtTime(0.16, t + 0.25)
+  pumpG.gain.setValueAtTime(0.16, t + dur - 0.35)
+  pumpG.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.05)
+  pump.connect(pumpLp).connect(pumpG).connect(out)
+  pump.start(t)
+  pump.stop(t + dur)
+
+  // motor whine an octave-and-a-bit up, quieter
+  const whine = c.createOscillator()
+  whine.type = 'triangle'
+  whine.frequency.setValueAtTime(direction === 'up' ? 410 : 340, t)
+  whine.frequency.linearRampToValueAtTime(direction === 'up' ? 330 : 430, t + dur * 0.8)
+  const whineG = c.createGain()
+  whineG.gain.setValueAtTime(0.0001, t)
+  whineG.gain.exponentialRampToValueAtTime(0.035, t + 0.3)
+  whineG.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.1)
+  whine.connect(whineG).connect(out)
+  whine.start(t)
+  whine.stop(t + dur)
+
+  // airflow rumble while the doors are open
+  const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate)
+  const data = buf.getChannelData(0)
+  let last = 0
+  for (let i = 0; i < data.length; i++) {
+    const white = Math.random() * 2 - 1
+    last = (last + 0.03 * white) / 1.03
+    data[i] = last * 3
+  }
+  const wind = c.createBufferSource()
+  wind.buffer = buf
+  const windLp = c.createBiquadFilter()
+  windLp.type = 'lowpass'
+  windLp.frequency.value = 500
+  const windG = c.createGain()
+  windG.gain.setValueAtTime(0.0001, t)
+  windG.gain.exponentialRampToValueAtTime(0.12, t + 0.4)
+  windG.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.05)
+  wind.connect(windLp).connect(windG).connect(out)
+  wind.start(t)
+  wind.stop(t + dur)
+
+  // the locking clunk: low thump + short metallic tick
+  const clunkAt = t + dur - 0.12
+  const thump = c.createOscillator()
+  thump.type = 'sine'
+  thump.frequency.setValueAtTime(64, clunkAt)
+  thump.frequency.exponentialRampToValueAtTime(34, clunkAt + 0.16)
+  const thumpG = c.createGain()
+  thumpG.gain.setValueAtTime(0.0001, clunkAt)
+  thumpG.gain.exponentialRampToValueAtTime(0.5, clunkAt + 0.012)
+  thumpG.gain.exponentialRampToValueAtTime(0.0001, clunkAt + 0.22)
+  thump.connect(thumpG).connect(out)
+  thump.start(clunkAt)
+  thump.stop(clunkAt + 0.3)
+
+  const tickSrc = c.createBufferSource()
+  tickSrc.buffer = buf
+  const tickBp = c.createBiquadFilter()
+  tickBp.type = 'bandpass'
+  tickBp.frequency.value = 1600
+  tickBp.Q.value = 2
+  const tickG = c.createGain()
+  tickG.gain.setValueAtTime(0.0001, clunkAt)
+  tickG.gain.exponentialRampToValueAtTime(0.22, clunkAt + 0.008)
+  tickG.gain.exponentialRampToValueAtTime(0.0001, clunkAt + 0.07)
+  tickSrc.connect(tickBp).connect(tickG).connect(out)
+  tickSrc.start(clunkAt)
+  tickSrc.stop(clunkAt + 0.1)
+
+  window.setTimeout(() => void c.close(), (dur + 0.6) * 1000)
+}

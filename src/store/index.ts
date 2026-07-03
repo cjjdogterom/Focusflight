@@ -28,6 +28,7 @@ export type Screen =
   | 'collection'
   | 'settings'
   | 'passport'
+  | 'trends'
 
 export interface BookingDraft {
   destinationIata: string | null
