@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import FlightCanvas, { type FlightCanvasHandle, type FollowMode } from '../components/FlightCanvas'
 import {
   IconSoundOn, IconSoundOff, IconFollow, IconTrackUp, IconExpand, IconMoon,
-  IconPause, IconPlay, IconX, IconLayers,
+  IconPause, IconPlay, IconX, IconLayers, IconSkipEnd,
 } from '../components/icons'
 import { aircraftById } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
@@ -220,6 +220,17 @@ export default function ActiveFlight() {
     }
   }
 
+  // jump to the final minute to preview the landing (keeps the session valid)
+  const skipToLanding = () => {
+    const targetSec = Math.max(0, duration - 60)
+    if (pausedRef.current) {
+      setPaused(false)
+      pausedRef.current = false
+      pausedAccum.current += performance.now() - pauseStart.current
+    }
+    startRef.current = performance.now() - targetSec * 1000 - pausedAccum.current
+  }
+
   return (
     <div className="relative h-full w-full select-none">
       <FlightCanvas
@@ -363,6 +374,14 @@ export default function ActiveFlight() {
                     className="w-10 h-10 rounded-full bg-black/55 border border-white/20 text-white/85 grid place-items-center active:scale-95 transition-transform"
                   >
                     <IconX size={15} />
+                  </button>
+                  <button
+                    onClick={skipToLanding}
+                    aria-label="Spoel door naar de landing"
+                    title="Naar de laatste minuut"
+                    className="w-10 h-10 rounded-full bg-black/55 border border-white/20 text-white/85 grid place-items-center active:scale-95 transition-transform"
+                  >
+                    <IconSkipEnd size={16} />
                   </button>
                 </div>
               </div>

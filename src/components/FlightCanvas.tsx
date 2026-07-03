@@ -652,7 +652,7 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
       dot(0, -ph * 0.05, pw * 0.018, '255,40,40', Math.max(0, bp) ** 3 * 0.45)
     }
 
-    const planePx = 60 * (aircraft.scale || 1)
+    const planePx = 50 * (aircraft.scale || 1)
 
     // aircraft (3D; heading relative to the rotated map)
     const [px, py] = planeScr

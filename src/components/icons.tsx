@@ -126,6 +126,9 @@ export const IconPlay = ({ size = 20, className }: IconProps) =>
 export const IconX = ({ size = 20, className }: IconProps) =>
   base(size, className, <path d="M6 6l12 12M18 6 6 18" />)
 
+export const IconSkipEnd = ({ size = 20, className }: IconProps) =>
+  base(size, className, <path d="m6 6 7 6-7 6V6ZM17 5.5v13" strokeWidth="2" />)
+
 export const IconChevronRight = ({ size = 20, className }: IconProps) =>
   base(size, className, <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />)
 
