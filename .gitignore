@@ -7,3 +7,5 @@ dist-ssr
 
 # personal files
 *.xlsx
+.vercel
+.env*

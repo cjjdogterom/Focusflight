@@ -9,7 +9,6 @@ import Landing from './screens/Landing'
 import FlightLog from './screens/FlightLog'
 import Collection from './screens/Collection'
 import Settings from './screens/Settings'
-import Globe from './screens/Globe'
 import Passport from './screens/Passport'
 
 export default function App() {
@@ -40,7 +39,6 @@ export default function App() {
       {screen === 'flightlog' && <FlightLog />}
       {screen === 'collection' && <Collection />}
       {screen === 'settings' && <Settings />}
-      {screen === 'globe' && <Globe />}
       {screen === 'passport' && <Passport />}
     </div>
   )

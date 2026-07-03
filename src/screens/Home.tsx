@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { airportByIata } from '../data/airports'
-import { IconGear, IconLog, IconCards, IconDice, IconCheck, IconReturn, IconGlobe, IconPassport } from '../components/icons'
+import { IconGear, IconLog, IconCards, IconDice, IconCheck, IconReturn, IconPassport } from '../components/icons'
 import { currentCard } from '../data/memberships'
 import { Card } from './Collection'
 import { formatDuration } from '../lib/flight'
@@ -84,7 +84,7 @@ export default function Home() {
           <button className="btn-primary w-full text-[17px]" onClick={() => setScreen('booking')}>
             Boek mijn vlucht
           </button>
-          <div className="flex flex-wrap gap-2 [&>button]:flex-1 [&>button]:basis-[30%]">
+          <div className="grid grid-cols-4 gap-2">
             <button
               className="btn-ghost !px-2 text-[14px]"
               onClick={() => {
@@ -99,9 +99,6 @@ export default function Home() {
             </button>
             <button className="btn-ghost !px-2 text-[14px]" onClick={() => setScreen('collection')}>
               <IconCards size={16} /> Kaarten
-            </button>
-            <button className="btn-ghost !px-2 text-[14px]" onClick={() => setScreen('globe')}>
-              <IconGlobe size={16} /> Globe
             </button>
             <button className="btn-ghost !px-2 text-[14px]" onClick={() => setScreen('passport')}>
               <IconPassport size={16} /> Paspoort

@@ -27,7 +27,6 @@ export type Screen =
   | 'flightlog'
   | 'collection'
   | 'settings'
-  | 'globe'
   | 'passport'
 
 export interface BookingDraft {

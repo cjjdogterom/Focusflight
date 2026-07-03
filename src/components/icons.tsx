@@ -158,16 +158,6 @@ export const IconCheck = ({ size = 20, className }: IconProps) =>
 export const IconReturn = ({ size = 20, className }: IconProps) =>
   base(size, className, <path d="M9.5 6 5 10.5 9.5 15M5 10.5h10a4.5 4.5 0 0 1 0 9H12" />)
 
-export const IconGlobe = ({ size = 20, className }: IconProps) =>
-  base(
-    size,
-    className,
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3c2.6 2.5 3.9 5.6 3.9 9S14.6 18.5 12 21c-2.6-2.5-3.9-5.6-3.9-9S9.4 5.5 12 3Z" />
-    </>,
-  )
-
 export const IconLayers = ({ size = 20, className }: IconProps) =>
   base(
     size,
