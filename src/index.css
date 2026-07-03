@@ -1,0 +1,259 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0b0d10;
+  color: #f2f4f7;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer components {
+  /* ---- iOS-style surfaces ---- */
+  .card {
+    @apply rounded-2xl;
+    background: rgba(255, 255, 255, 0.055);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(30px) saturate(1.8);
+    -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    border: 0.5px solid rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  /* ---- buttons: white pill primary (reference style) ---- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 select-none active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none;
+    min-height: 48px;
+    padding: 0 1.5rem;
+  }
+  .btn-primary {
+    @apply btn;
+    background: #ffffff;
+    color: #0b0d10;
+    box-shadow: 0 8px 28px -10px rgba(0, 0, 0, 0.6);
+  }
+  .btn-primary:hover {
+    background: #eef0f3;
+  }
+  .btn-ghost,
+  .glass-btn {
+    @apply btn;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(26px) saturate(1.8);
+    -webkit-backdrop-filter: blur(26px) saturate(1.8);
+    border: 0.5px solid rgba(255, 255, 255, 0.16);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.18);
+    color: #f2f4f7;
+  }
+  .btn-ghost:hover,
+  .glass-btn:hover {
+    background: rgba(255, 255, 255, 0.13);
+  }
+  .glass-btn--primary {
+    @apply btn-primary;
+  }
+  .glass-btn--danger {
+    background: rgba(70, 26, 32, 0.85);
+    border-color: rgba(255, 100, 120, 0.22);
+    color: #ff9aa8;
+  }
+
+  /* floating dark rounded-square map button (iOS) */
+  .ios-btn {
+    @apply inline-flex items-center justify-center transition-all duration-200 active:scale-[0.94];
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(28px) saturate(1.8);
+    -webkit-backdrop-filter: blur(28px) saturate(1.8);
+    border: 0.5px solid rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.95);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 6px 18px -8px rgba(0, 0, 0, 0.55);
+  }
+  .ios-btn--active {
+    background: #ffffff;
+    color: #0b0d10;
+  }
+  .glass-icon {
+    @apply ios-btn;
+    border-radius: 9999px;
+  }
+
+  .avlabel {
+    @apply text-[11px] font-medium tracking-wide text-white/45;
+  }
+
+  .du {
+    @apply rounded-2xl;
+    background: rgba(255, 255, 255, 0.055);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ---- metallic membership cards ---- */
+.metal-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35),
+    0 18px 40px -18px rgba(0, 0, 0, 0.8);
+}
+.metal-card::before {
+  /* brushed-metal line texture */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    175deg,
+    rgba(255, 255, 255, 0.09) 0 1px,
+    rgba(0, 0, 0, 0.05) 1px 3px
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.metal-card::after {
+  /* diagonal sheen */
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.32) 46%,
+    rgba(255, 255, 255, 0.05) 55%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.metal-engrave {
+  font-family: ui-serif, 'New York', Georgia, serif;
+  letter-spacing: 0.01em;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35),
+    0 -1px 1px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- boarding-pass barcode ---- */
+.barcode {
+  height: 44px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #101418 0 2px,
+    transparent 2px 4px,
+    #101418 4px 7px,
+    transparent 7px 8px,
+    #101418 8px 9px,
+    transparent 9px 13px,
+    #101418 13px 14px,
+    transparent 14px 16px
+  );
+}
+
+/* ---- iOS toggle ---- */
+.avswitch {
+  @apply relative inline-flex w-12 h-7 rounded-full p-1 transition-colors;
+}
+.avswitch--on {
+  background: #33c759;
+}
+.avswitch--off {
+  background: rgba(120, 120, 128, 0.32);
+}
+.avswitch-knob {
+  @apply block w-5 h-5 rounded-full transition-transform bg-white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- card unlock reveal ---- */
+/* ---- motion: refined enter + staggered children ---- */
+@keyframes rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-fade-in {
+  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > * {
+  animation: rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.07s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.17s; }
+.stagger > *:nth-child(5) { animation-delay: 0.22s; }
+.stagger > *:nth-child(6) { animation-delay: 0.27s; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .stagger > *,
+  .card-reveal {
+    animation: none !important;
+  }
+  .metal-card::after {
+    animation: none !important;
+  }
+}
+
+/* slow light drift across the metal cards */
+@keyframes sheen-drift {
+  0% { transform: translateX(-14%); }
+  100% { transform: translateX(14%); }
+}
+.metal-card::after {
+  animation: sheen-drift 7s ease-in-out infinite alternate;
+}
+
+@keyframes card-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) rotateX(26deg) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotateX(0) scale(1);
+  }
+}
+.card-reveal {
+  animation: card-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

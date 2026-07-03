@@ -1,0 +1,17 @@
+Plaats hier het 3D-model van de KLM 747 als:  klm-747.glb
+
+Zo download je het (gratis Sketchfab-account nodig):
+1. Ga naar: https://sketchfab.com/3d-models/klm-747-200-5e39a91e749e4798abef1c99a2000e27
+   (dit is exact hetzelfde model als de link die je stuurde, maar met downloads aan,
+   licentie CC Attribution — maker: zairiq-123 / origineel: Dave Bored SketchFab)
+   Alternatief (meer detail, 38k faces): https://sketchfab.com/3d-models/6d47915471d44dfeb9d822405709c563
+2. Log in en klik "Download 3D model" -> kies "glTF Binary (.glb)"  (autoconverted)
+3. Hernoem het bestand naar  klm-747.glb  en zet het in deze map (public/models/)
+4. Herlaad de app — de console meldt "[Plane3D] GLB model loaded" en het model
+   vervangt automatisch de ingebouwde 747 (alleen bij KLM + Boeing 747-400).
+
+Wijst de neus de verkeerde kant op? Pas GLB_YAW_DEG aan in src/components/Plane3D.ts
+(bijv. 180).
+
+Licentie CC Attribution: naamsvermelding vereist — voor privégebruik voldoende om
+de maker te vermelden (staat al in Instellingen > Over deze app zodra je 'm gebruikt).
