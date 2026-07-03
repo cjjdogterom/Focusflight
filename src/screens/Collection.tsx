@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStore } from '../store'
 import { IconBack, IconPlane } from '../components/icons'
 import {
@@ -16,6 +17,7 @@ export default function Collection() {
   const active = currentCard(totalMiles)
   const next = nextCard(totalMiles)
   const progress = next ? ((totalMiles - active.kmMin) / (next.kmMin - active.kmMin)) * 100 : 100
+  const [cardOut, setCardOut] = useState(false)
 
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
@@ -27,9 +29,30 @@ export default function Collection() {
           <h1 className="text-[22px] font-bold tracking-tight">Membership</h1>
         </div>
 
-        {/* active card + progress (reference layout) */}
+        {/* active card in its leather wallet — tap to slide it out */}
         <div>
-          <Card card={active} large />
+          <button
+            onClick={() => setCardOut((v) => !v)}
+            className="block w-full text-left"
+            aria-label={cardOut ? 'Kaart terugsteken' : 'Kaart uit de portemonnee halen'}
+          >
+            <div className="relative pt-2 pb-1 overflow-visible">
+              {/* the card, tucked into the pocket */}
+              <div className={`wallet-card ${cardOut ? 'wallet-card--out' : ''} relative z-0 px-3`}>
+                <Card card={active} large />
+              </div>
+              {/* the stitched leather pocket over the lower half */}
+              <div className="leather relative z-10 -mt-[34%] h-44 rounded-2xl">
+                <div className="leather-stitch" />
+                <div className="absolute inset-x-0 bottom-5 text-center">
+                  <p className="leather-emboss text-[12px] uppercase">FocusFlight Club</p>
+                  <p className="text-[10px] text-white/25 mt-1.5">
+                    {cardOut ? 'tik om terug te steken' : 'tik om je kaart te pakken'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </button>
           <div className="mt-5">
             <div className="h-[5px] rounded-full bg-white/12 overflow-hidden">
               <div

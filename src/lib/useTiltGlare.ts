@@ -2,10 +2,14 @@ import { useEffect } from 'react'
 
 // Moves the sheen on the metal membership cards with the phone's physical
 // tilt (gyroscope), like the glare on a real card. Sets --glare-x/--glare-y
-// on <html> plus a `has-tilt` class; CSS does the rest. On iOS the motion
-// API needs a permission prompt from a user gesture, so we ask on the first
-// tap. Without a gyroscope (desktop) nothing changes — the subtle drift
-// animation stays.
+// on <html> plus a `has-tilt` class; CSS does the rest.
+//
+// iOS quirks handled here: DeviceOrientationEvent.requestPermission() only
+// shows its prompt from a REAL user activation — Safari does not count
+// `pointerdown`, so we listen to `click`/`touchend`. We also keep asking on
+// every tap until granted (a dismissed prompt would otherwise disable the
+// effect for the whole session), and we try once silently on mount for the
+// case where permission was granted before.
 
 export function useTiltGlare() {
   useEffect(() => {
@@ -13,9 +17,10 @@ export function useTiltGlare() {
     let raf = 0
     let x = 0
     let y = 0
-    let sx = 0 // smoothed
+    let sx = 0
     let sy = 0
     let active = false
+    let attached = false
 
     const apply = () => {
       raf = 0
@@ -34,36 +39,50 @@ export function useTiltGlare() {
         active = true
         root.classList.add('has-tilt')
       }
-      // gamma: left/right roll (±90°), beta: pitch — 40° is a natural
-      // in-hand holding angle, so that reads as "neutral"
+      // gamma: left/right roll, beta: pitch — ~40° is the natural in-hand angle
       x = Math.max(-1, Math.min(1, e.gamma / 28))
       y = Math.max(-1, Math.min(1, (e.beta - 40) / 28))
       if (!raf) raf = requestAnimationFrame(apply)
     }
 
-    const attach = () => window.addEventListener('deviceorientation', onOrient)
+    const attach = () => {
+      if (attached) return
+      attached = true
+      window.addEventListener('deviceorientation', onOrient)
+    }
 
     const D = DeviceOrientationEvent as unknown as {
       requestPermission?: () => Promise<string>
     }
-    let once: (() => void) | null = null
-    if (typeof D?.requestPermission === 'function') {
-      once = () => {
-        D.requestPermission!()
-          .then((state) => {
-            if (state === 'granted') attach()
-          })
-          .catch(() => {})
-        if (once) window.removeEventListener('pointerdown', once)
-        once = null
-      }
-      window.addEventListener('pointerdown', once)
+    const needsPermission = typeof D?.requestPermission === 'function'
+
+    const tryPermission = () => {
+      if (attached) return
+      D.requestPermission!()
+        .then((state) => {
+          if (state === 'granted') {
+            attach()
+            window.removeEventListener('click', tryPermission)
+            window.removeEventListener('touchend', tryPermission)
+          }
+        })
+        .catch(() => {
+          /* not a user gesture yet — the next tap will retry */
+        })
+    }
+
+    if (needsPermission) {
+      // if it was granted earlier, this resolves without showing a prompt
+      tryPermission()
+      window.addEventListener('click', tryPermission)
+      window.addEventListener('touchend', tryPermission)
     } else {
       attach()
     }
 
     return () => {
-      if (once) window.removeEventListener('pointerdown', once)
+      window.removeEventListener('click', tryPermission)
+      window.removeEventListener('touchend', tryPermission)
       window.removeEventListener('deviceorientation', onOrient)
       if (raf) cancelAnimationFrame(raf)
       root.classList.remove('has-tilt')

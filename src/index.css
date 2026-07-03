@@ -371,3 +371,62 @@ body {
 .card-reveal {
   animation: card-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* ---- leather goods: the card wallet and the flight-log folder ---- */
+.leather {
+  position: relative;
+  background:
+    radial-gradient(130% 90% at 28% 0%, rgba(255, 255, 255, 0.07), transparent 55%),
+    repeating-linear-gradient(23deg, rgba(0, 0, 0, 0.09) 0 2px, rgba(255, 255, 255, 0.015) 2px 5px),
+    repeating-linear-gradient(-31deg, rgba(0, 0, 0, 0.07) 0 3px, rgba(255, 255, 255, 0.012) 3px 7px),
+    linear-gradient(165deg, #46332a 0%, #2e211a 55%, #221711 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -10px 22px rgba(0, 0, 0, 0.4),
+    0 22px 44px -18px rgba(0, 0, 0, 0.85);
+}
+.leather-stitch {
+  position: absolute;
+  inset: 9px;
+  border: 1.5px dashed rgba(216, 186, 148, 0.32);
+  border-radius: inherit;
+  pointer-events: none;
+}
+/* debossed lettering pressed into the hide */
+.leather-emboss {
+  color: rgba(0, 0, 0, 0.34);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.09);
+  letter-spacing: 0.3em;
+  font-weight: 700;
+}
+
+/* card wallet: the membership card sits inside a stitched pocket */
+.wallet-card {
+  transition: transform 0.55s cubic-bezier(0.22, 1.2, 0.36, 1);
+  transform: translateY(30%);
+}
+.wallet-card.wallet-card--out {
+  transform: translateY(-8%);
+}
+
+/* boarding-pass ticket with punched notches at the fold line */
+.ticket {
+  position: relative;
+  background: linear-gradient(170deg, #1b1e24 0%, #14171c 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 30px -16px rgba(0, 0, 0, 0.75);
+}
+.ticket-notch::before,
+.ticket-notch::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0b0d10;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.ticket-notch::before { left: -9px; }
+.ticket-notch::after { right: -9px; }

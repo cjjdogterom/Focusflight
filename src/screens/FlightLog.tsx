@@ -1,7 +1,11 @@
 import { useStore } from '../store'
-import { IconBack, IconX } from '../components/icons'
+import { IconBack, IconX, IconPlane } from '../components/icons'
 import { formatDuration } from '../lib/flight'
 import type { FlightLogEntry } from '../types'
+
+// Pilot log as a stack of boarding-pass tickets sliding out of a leather
+// folder: date + status badge, big IATA pair, times and distance, with
+// punched notches on the fold line.
 
 function toCSV(rows: FlightLogEntry[]): string {
   const header = [
@@ -35,11 +39,19 @@ function toCSV(rows: FlightLogEntry[]): string {
   return [header.join(','), ...lines].join('\n')
 }
 
+function ticketTime(totalSec: number): string {
+  const min = Math.max(1, Math.round(totalSec / 60))
+  if (min < 60) return `${min}m`
+  return `${Math.floor(min / 60)}u ${min % 60}m`
+}
+
 export default function FlightLog() {
   const flights = useStore((s) => s.flights)
   const totalMiles = useStore((s) => s.totalMiles)
   const setScreen = useStore((s) => s.setScreen)
   const removeFlight = useStore((s) => s.removeFlight)
+
+  const totalFocus = flights.reduce((s, f) => s + f.completedSec, 0)
 
   const onDelete = (f: FlightLogEntry) => {
     if (
@@ -51,8 +63,6 @@ export default function FlightLog() {
     }
   }
 
-  const totalFocus = flights.reduce((s, f) => s + f.completedSec, 0)
-
   const exportCSV = () => {
     const blob = new Blob([toCSV(flights)], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -63,9 +73,14 @@ export default function FlightLog() {
     URL.revokeObjectURL(url)
   }
 
+  const fmtTime = (ms: number) =>
+    new Date(ms).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+  const fmtDate = (ms: number) =>
+    new Date(ms).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
-      <div className="max-w-lg mx-auto px-5 py-6 flex flex-col gap-4 animate-fade-in">
+      <div className="max-w-lg mx-auto px-5 pt-6 pb-44 flex flex-col gap-4 animate-fade-in">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setScreen('home')}
@@ -94,56 +109,104 @@ export default function FlightLog() {
         {flights.length === 0 ? (
           <div className="card p-10 text-center text-white/50">Nog geen vluchten gelogd.</div>
         ) : (
-          <section className="card overflow-hidden">
-            {/* logbook header row */}
-            <div className="grid grid-cols-[64px_1fr_56px_20px_24px] gap-2 px-4 py-2 border-b border-white/10 avlabel">
-              <span>Datum</span>
-              <span>Route</span>
-              <span>Block</span>
-              <span />
-              <span />
-            </div>
-            <div className="divide-y divide-white/5">
-              {flights.map((f) => {
-                return (
-                  <div
-                    key={f.id}
-                    className="group grid grid-cols-[64px_1fr_56px_20px_24px] gap-2 px-4 py-2.5 items-center font-mono text-[12.5px]"
+          <div className="flex flex-col gap-4 stagger">
+            {flights.map((f) => (
+              <div key={f.id} className="ticket p-0 overflow-visible">
+                {/* header: date + status */}
+                <div className="flex items-center justify-between px-5 pt-4">
+                  <p className="text-[13px] text-white/55">{fmtDate(f.startedAt)}</p>
+                  <span
+                    className={`text-[10px] font-bold tracking-[0.14em] uppercase px-2 py-1 rounded-md ${
+                      f.completed
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : 'bg-amber-500/15 text-amber-300'
+                    }`}
                   >
-                    <span className="text-white/55">
-                      {new Date(f.startedAt).toLocaleDateString('nl-NL', {
-                        day: '2-digit',
-                        month: '2-digit',
-                      })}{' '}
-                      {new Date(f.startedAt).toLocaleTimeString('nl-NL', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                    <span className="truncate">
-                      <span className="text-sky-accent">{f.fromIata}</span>
-                      <span className="text-white/35">–</span>
-                      <span className="text-sky-accent">{f.toIata}</span>{' '}
-                      <span className="text-white/55">{f.toCity}</span>
-                    </span>
-                    <span className="text-av-amber tabular-nums">{formatDuration(f.completedSec)}</span>
-                    <span className={f.completed ? 'text-av-green' : 'text-av-amber'}>
-                      {f.completed ? '✓' : '↩'}
-                    </span>
-                    <button
-                      onClick={() => onDelete(f)}
-                      aria-label={`Verwijder vlucht ${f.fromIata} naar ${f.toIata}`}
-                      className="grid place-items-center w-6 h-6 rounded-md text-white/25 hover:text-rose-300 hover:bg-rose-500/10 active:scale-90 transition"
-                    >
-                      <IconX size={13} />
-                    </button>
+                    {f.completed ? 'Geland' : 'Omgeleid'}
+                  </span>
+                </div>
+
+                {/* route */}
+                <div className="flex items-center gap-3 px-5 pt-3 pb-4">
+                  <div className="min-w-0">
+                    <p className="text-[30px] font-bold tracking-tight leading-none">{f.fromIata}</p>
+                    <p className="text-[12px] text-white/50 truncate mt-1">{f.fromCity}</p>
                   </div>
-                )
-              })}
-            </div>
-          </section>
+                  <div className="flex-1 flex flex-col items-center px-1 text-white/35">
+                    <span className="text-[11px] tabular-nums text-white/45 mb-0.5">
+                      {ticketTime(f.completedSec)}
+                    </span>
+                    <div className="w-full flex items-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
+                      <span className="h-px flex-1 bg-white/15" />
+                      <IconPlane size={14} className="mx-1" />
+                      <span className="h-px flex-1 bg-white/15" />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          f.completed ? 'bg-emerald-400/80' : 'bg-amber-400/80'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className="text-[30px] font-bold tracking-tight leading-none">{f.toIata}</p>
+                    <p className="text-[12px] text-white/50 truncate mt-1">{f.toCity}</p>
+                  </div>
+                </div>
+
+                {/* fold line with punched notches */}
+                <div className="relative ticket-notch mx-0">
+                  <div className="mx-5 border-t border-dashed border-white/15" />
+                </div>
+
+                {/* stub: times + distance + delete */}
+                <div className="flex items-center px-5 py-3.5">
+                  <div className="flex-1">
+                    <p className="text-[11px] text-white/40">Vertrek</p>
+                    <p className="text-[15px] font-semibold tabular-nums">{fmtTime(f.startedAt)}</p>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <p className="text-[11px] text-white/40">Afstand</p>
+                    <p className="text-[15px] font-semibold tabular-nums">
+                      {f.miles.toLocaleString('nl-NL')} km
+                    </p>
+                  </div>
+                  <div className="flex-1 text-right">
+                    <p className="text-[11px] text-white/40">Aankomst</p>
+                    <p className="text-[15px] font-semibold tabular-nums">{fmtTime(f.endedAt)}</p>
+                  </div>
+                  <button
+                    onClick={() => onDelete(f)}
+                    aria-label={`Verwijder vlucht ${f.fromIata} naar ${f.toIata}`}
+                    className="ml-4 grid place-items-center w-7 h-7 rounded-md text-white/25 hover:text-rose-300 hover:bg-rose-500/10 active:scale-90 transition"
+                  >
+                    <IconX size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
+
+      {/* the leather folder the tickets live in — tap to close */}
+      <button
+        onClick={() => setScreen('home')}
+        aria-label="Logboek sluiten"
+        className="fixed bottom-0 inset-x-0 z-20 h-36 max-w-lg mx-auto block w-full text-left"
+      >
+        <div className="leather absolute inset-x-4 top-0 bottom-[-24px] rounded-t-[26px]">
+          <div className="leather-stitch !bottom-0 !rounded-b-none" />
+          {/* folder tab */}
+          <div className="leather absolute -top-5 right-8 w-28 h-7 rounded-t-xl" />
+          <p className="leather-emboss absolute inset-x-0 top-9 text-center text-[20px] uppercase">
+            Flight Log
+          </p>
+          <p className="absolute inset-x-0 top-[74px] text-center text-[10px] text-white/25">
+            tik op de map om te sluiten
+          </p>
+        </div>
+      </button>
     </div>
   )
 }
