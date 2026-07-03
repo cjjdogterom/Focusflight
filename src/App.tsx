@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
 import { useTiltGlare } from './lib/useTiltGlare'
+import { primeFx } from './lib/audio'
 import Onboarding from './screens/Onboarding'
 import Home from './screens/Home'
 import Booking from './screens/Booking'
@@ -22,6 +23,17 @@ export default function App() {
   useEffect(() => {
     void init()
   }, [init])
+
+  // iOS: audio contexts must be created/resumed inside a user gesture —
+  // prime the shared effects context on the first tap
+  useEffect(() => {
+    const once = () => {
+      primeFx()
+      window.removeEventListener('pointerdown', once)
+    }
+    window.addEventListener('pointerdown', once)
+    return () => window.removeEventListener('pointerdown', once)
+  }, [])
 
   if (!ready) {
     return (

@@ -80,7 +80,7 @@ export default function FlightLog() {
 
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
-      <div className="max-w-lg mx-auto px-5 pt-6 pb-44 flex flex-col gap-4 animate-fade-in">
+      <div className="max-w-lg mx-auto px-5 py-6 flex flex-col gap-4 animate-fade-in">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setScreen('home')}
@@ -205,24 +205,6 @@ export default function FlightLog() {
         )}
       </div>
 
-      {/* the leather folder the tickets live in — tap to close */}
-      <button
-        onClick={() => setScreen('home')}
-        aria-label="Logboek sluiten"
-        className="fixed bottom-0 inset-x-0 z-20 h-36 max-w-lg mx-auto block w-full text-left"
-      >
-        <div className="leather absolute inset-x-4 top-0 bottom-[-24px] rounded-t-[26px]">
-          <div className="leather-stitch !bottom-0 !rounded-b-none" />
-          {/* folder tab */}
-          <div className="leather absolute -top-5 right-8 w-28 h-7 rounded-t-xl" />
-          <p className="leather-emboss absolute inset-x-0 top-9 text-center text-[20px] uppercase">
-            Flight Log
-          </p>
-          <p className="absolute inset-x-0 top-[74px] text-center text-[10px] text-white/25">
-            tik op de map om te sluiten
-          </p>
-        </div>
-      </button>
     </div>
   )
 }

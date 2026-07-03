@@ -289,9 +289,19 @@ export function setVolume(v: number) {
  * load, a burst of airflow while the doors are open, and the locking CLUNK
  * at the end. Fully synthesised; independent of the ambience context.
  */
-export function playGear(direction: 'up' | 'down') {
+let fxCtx: AudioContext | null = null
+
+/** shared effects context — create/resume during a user gesture when we can */
+export function primeFx() {
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-  const c = new AC()
+  if (!fxCtx) fxCtx = new AC()
+  if (fxCtx.state === 'suspended') void fxCtx.resume()
+  return fxCtx
+}
+
+export function playGear(direction: 'up' | 'down') {
+  const c = primeFx()
+  if (c.state !== 'running') return
   const out = c.createGain()
   out.gain.value = 0.5
   out.connect(c.destination)
@@ -379,13 +389,13 @@ export function playGear(direction: 'up' | 'down') {
   tickSrc.start(clunkAt)
   tickSrc.stop(clunkAt + 0.1)
 
-  window.setTimeout(() => void c.close(), (dur + 0.6) * 1000)
+  window.setTimeout(() => out.disconnect(), (dur + 0.8) * 1000)
 }
 
 /** short paper-tear ripple for the boarding-pass stub */
 export function playTear() {
-  const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-  const c = new AC()
+  const c = primeFx()
+  if (c.state !== 'running') return
   const out = c.createGain()
   out.gain.value = 0.5
   out.connect(c.destination)
@@ -412,48 +422,5 @@ export function playTear() {
   src.connect(bp).connect(g).connect(out)
   src.start(t)
   src.stop(t + dur)
-  window.setTimeout(() => void c.close(), (dur + 0.3) * 1000)
-}
-
-// ---- throttle: a continuous engine tone that follows the lever ----
-let thrCtx: AudioContext | null = null
-let thrOsc: OscillatorNode | null = null
-let thrGain: GainNode | null = null
-
-export function throttleTone(level: number) {
-  // level 0..1 — spool the engines up with the lever
-  if (!thrCtx) {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    thrCtx = new AC()
-    thrOsc = thrCtx.createOscillator()
-    thrOsc.type = 'sawtooth'
-    const lp = thrCtx.createBiquadFilter()
-    lp.type = 'lowpass'
-    lp.frequency.value = 420
-    thrGain = thrCtx.createGain()
-    thrGain.gain.value = 0
-    thrOsc.connect(lp).connect(thrGain).connect(thrCtx.destination)
-    thrOsc.frequency.value = 55
-    thrOsc.start()
-  }
-  const t = thrCtx.currentTime
-  thrOsc!.frequency.setTargetAtTime(55 + level * 130, t, 0.12)
-  thrGain!.gain.setTargetAtTime(level * 0.16, t, 0.1)
-}
-
-export function throttleToneStop() {
-  if (!thrCtx) return
-  const c = thrCtx
-  thrGain?.gain.setTargetAtTime(0, c.currentTime, 0.2)
-  window.setTimeout(() => {
-    try {
-      thrOsc?.stop()
-    } catch {
-      /* fine */
-    }
-    void c.close()
-  }, 700)
-  thrCtx = null
-  thrOsc = null
-  thrGain = null
+  window.setTimeout(() => out.disconnect(), (dur + 0.5) * 1000)
 }

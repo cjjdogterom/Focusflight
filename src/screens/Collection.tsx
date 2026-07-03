@@ -17,7 +17,6 @@ export default function Collection() {
   const active = currentCard(totalMiles)
   const next = nextCard(totalMiles)
   const progress = next ? ((totalMiles - active.kmMin) / (next.kmMin - active.kmMin)) * 100 : 100
-  const [cardOut, setCardOut] = useState(false)
   const [infoCard, setInfoCard] = useState<MembershipCard | null>(null)
 
   return (
@@ -30,50 +29,9 @@ export default function Collection() {
           <h1 className="text-[22px] font-bold tracking-tight">Membership</h1>
         </div>
 
-        {/* active card in its light-suede wallet — tap to slide it out */}
+        {/* active card + progress */}
         <div>
-          <button
-            onClick={() => setCardOut((v) => !v)}
-            className="block w-full text-left"
-            aria-label={cardOut ? 'Kaart terugsteken' : 'Kaart uit de portemonnee halen'}
-          >
-            <div className="leather-light relative rounded-[26px] aspect-[1.75] overflow-hidden">
-              <div className="leather-stitch !inset-2.5 !rounded-[20px]" />
-              {/* the card in the right-hand slot */}
-              <div
-                className="absolute right-[4.5%] top-1/2 w-[58%] transition-transform duration-500"
-                style={{
-                  transform: cardOut
-                    ? 'translateY(-50%) translateX(26%) rotate(1.5deg)'
-                    : 'translateY(-50%)',
-                }}
-              >
-                <Card card={active} />
-              </div>
-              {/* left suede panel overlapping the card edge, with the seam */}
-              <div
-                className="leather-light absolute left-0 inset-y-0 w-[44%] rounded-r-[26px]"
-                style={{ boxShadow: '8px 0 16px -6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35)' }}
-              >
-                <div
-                  className="absolute inset-y-2.5 right-2 border-r-[1.5px] border-dashed"
-                  style={{ borderColor: 'rgba(70,64,56,0.35)' }}
-                />
-                <p className="leather-emboss absolute left-6 top-7 text-[15px] uppercase leading-snug">
-                  FocusFlight
-                  <br />
-                  Club
-                </p>
-                <IconPlane
-                  size={20}
-                  className="absolute left-6 bottom-6 text-black/30 [filter:drop-shadow(0_1px_0_rgba(255,255,255,0.3))]"
-                />
-              </div>
-              <p className="absolute right-5 bottom-3.5 text-[10px] text-black/35">
-                {cardOut ? 'tik om terug te steken' : 'tik om je kaart te pakken'}
-              </p>
-            </div>
-          </button>
+          <Card card={active} large />
           <div className="mt-5">
             <div className="h-[5px] rounded-full bg-white/12 overflow-hidden">
               <div
