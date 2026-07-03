@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { airportByIata } from '../data/airports'
-import { IconGear, IconLog, IconCards, IconDice, IconCheck, IconReturn, IconPassport } from '../components/icons'
+import {
+  IconGear, IconLog, IconCards, IconDice, IconCheck, IconReturn, IconPassport,
+  IconFullscreen, IconFullscreenExit,
+} from '../components/icons'
+import { useFullscreen } from '../lib/fullscreen'
 import { currentCard } from '../data/memberships'
 import { Card } from './Collection'
 import { formatDuration } from '../lib/flight'
@@ -28,6 +32,7 @@ export default function Home() {
   const setScreen = useStore((s) => s.setScreen)
   const pickRandom = useStore((s) => s.pickRandomDestination)
   const now = useClock()
+  const fs = useFullscreen()
 
   const today = flights.filter((f) => f.startedAt >= startOfToday())
   // streak: consecutive days (ending today or yesterday) with a completed flight
@@ -61,9 +66,20 @@ export default function Home() {
               {home?.iata} · {home?.city} · {lt}
             </p>
           </div>
-          <button onClick={() => setScreen('settings')} aria-label="Instellingen" className="ios-btn">
-            <IconGear size={19} />
-          </button>
+          <div className="flex gap-2">
+            {fs.supported && (
+              <button
+                onClick={fs.toggle}
+                aria-label={fs.active ? 'Verlaat volledig scherm' : 'Volledig scherm'}
+                className={`ios-btn ${fs.active ? 'ios-btn--active' : ''}`}
+              >
+                {fs.active ? <IconFullscreenExit size={19} /> : <IconFullscreen size={19} />}
+              </button>
+            )}
+            <button onClick={() => setScreen('settings')} aria-label="Instellingen" className="ios-btn">
+              <IconGear size={19} />
+            </button>
+          </div>
         </header>
 
         {/* membership card teaser */}

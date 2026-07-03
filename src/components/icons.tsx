@@ -81,6 +81,22 @@ export const IconExpand = ({ size = 20, className }: IconProps) =>
     <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />,
   )
 
+/** browser fullscreen: diagonal arrows out */
+export const IconFullscreen = ({ size = 20, className }: IconProps) =>
+  base(
+    size,
+    className,
+    <path d="M14 4h6v6M20 4l-6.5 6.5M10 20H4v-6M4 20l6.5-6.5" />,
+  )
+
+/** leave fullscreen: diagonal arrows in */
+export const IconFullscreenExit = ({ size = 20, className }: IconProps) =>
+  base(
+    size,
+    className,
+    <path d="M20 10h-6V4M14 10l6.5-6.5M4 14h6v6M10 14l-6.5 6.5" />,
+  )
+
 export const IconMoon = ({ size = 20, className }: IconProps) =>
   base(size, className, <path d="M20 13.5A7.5 7.5 0 0 1 10.5 4 7.9 7.9 0 1 0 20 13.5Z" />)
 

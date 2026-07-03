@@ -4,7 +4,9 @@ import FlightCanvas, { type FlightCanvasHandle, type FollowMode } from '../compo
 import {
   IconSoundOn, IconSoundOff, IconFollow, IconTrackUp, IconExpand, IconMoon,
   IconPause, IconPlay, IconX, IconLayers, IconSkipEnd, IconWrench,
+  IconFullscreen, IconFullscreenExit,
 } from '../components/icons'
+import { useFullscreen } from '../lib/fullscreen'
 import { aircraftById } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
 import { buildProfile, type FlightProfile } from '../lib/profile'
@@ -57,6 +59,7 @@ export default function ActiveFlight() {
   const setMapStyle = useStore((s) => s.setMapStyle)
   const followPref = useStore((s) => s.followPref)
   const setFollowPref = useStore((s) => s.setFollowPref)
+  const fs = useFullscreen()
 
   const mapRef = useRef<FlightCanvasHandle>(null)
   const rafRef = useRef<number>(0)
@@ -336,6 +339,15 @@ export default function ActiveFlight() {
             >
               <IconExpand />
             </button>
+            {fs.supported && (
+              <button
+                className={`ios-btn ${fs.active ? 'ios-btn--active' : ''}`}
+                aria-label={fs.active ? 'Verlaat volledig scherm' : 'Volledig scherm'}
+                onClick={fs.toggle}
+              >
+                {fs.active ? <IconFullscreenExit /> : <IconFullscreen />}
+              </button>
+            )}
             <button
               className={`ios-btn ${soundPanel ? 'ios-btn--active' : ''}`}
               aria-label="Geluid"
@@ -361,7 +373,10 @@ export default function ActiveFlight() {
           </div>
 
           {squawkOpen && (
-            <div className="absolute top-[232px] right-[70px] max-w-[calc(100vw-90px)] z-20 w-64 glass rounded-2xl p-3 animate-fade-in">
+            <div
+              className="absolute right-[70px] max-w-[calc(100vw-90px)] z-20 w-64 glass rounded-2xl p-3 animate-fade-in"
+              style={{ top: fs.supported ? 288 : 232 }}
+            >
               <p className="avlabel uppercase tracking-[0.12em] mb-2">Squawk — parkeer je gedachte</p>
               <input
                 autoFocus
@@ -378,7 +393,10 @@ export default function ActiveFlight() {
           )}
 
           {soundPanel && (
-            <div className="absolute top-[178px] right-[70px] max-w-[calc(100vw-90px)] z-20 w-60 glass rounded-2xl overflow-hidden animate-fade-in">
+            <div
+              className="absolute right-[70px] max-w-[calc(100vw-90px)] z-20 w-60 glass rounded-2xl overflow-hidden animate-fade-in"
+              style={{ top: fs.supported ? 234 : 178 }}
+            >
               <p className="avlabel uppercase tracking-[0.12em] px-4 pt-3 pb-1.5">Geluid aan boord</p>
               <div className="divide-y divide-white/[0.06]">
                 <button
