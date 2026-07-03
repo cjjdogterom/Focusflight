@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
+import { useTiltGlare } from './lib/useTiltGlare'
 import Onboarding from './screens/Onboarding'
 import Home from './screens/Home'
 import Booking from './screens/Booking'
@@ -15,6 +16,7 @@ export default function App() {
   const ready = useStore((s) => s.ready)
   const screen = useStore((s) => s.screen)
   const init = useStore((s) => s.init)
+  useTiltGlare()
 
   useEffect(() => {
     void init()

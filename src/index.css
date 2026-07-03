@@ -243,6 +243,12 @@ body {
 .metal-card::after {
   animation: sheen-drift 7s ease-in-out infinite alternate;
 }
+/* with a gyroscope the glare follows the physical tilt of the phone */
+.has-tilt .metal-card::after {
+  animation: none;
+  transform: translateX(calc(var(--glare-x, 0) * 30%))
+    translateY(calc(var(--glare-y, 0) * 16%));
+}
 
 @keyframes card-reveal {
   0% {
