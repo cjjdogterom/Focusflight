@@ -3,13 +3,13 @@ import { useStore } from '../store'
 import FlightCanvas, { type FlightCanvasHandle, type FollowMode } from '../components/FlightCanvas'
 import {
   IconSoundOn, IconSoundOff, IconFollow, IconTrackUp, IconExpand, IconMoon,
-  IconPause, IconPlay, IconX, IconLayers, IconSkipEnd,
+  IconPause, IconPlay, IconX, IconLayers, IconSkipEnd, IconWrench,
 } from '../components/icons'
 import { aircraftById } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
 import { buildProfile, type FlightProfile } from '../lib/profile'
 import { positionAt } from '../lib/geo'
-import { startAmbience, stopAmbience, playGear, SOUNDSCAPES } from '../lib/audio'
+import { startAmbience, stopAmbience, playGear, throttleTone, throttleToneStop, SOUNDSCAPES } from '../lib/audio'
 import runwaysData from '../data/runways.json'
 
 const RUNWAYS = runwaysData as unknown as Record<string, { lengthM: number; ident: string }>
@@ -48,6 +48,8 @@ export default function ActiveFlight() {
   const setSound = useStore((s) => s.setSound)
   const soundscape = useStore((s) => s.soundscape)
   const setSoundscape = useStore((s) => s.setSoundscape)
+  const addSquawk = useStore((s) => s.addSquawk)
+  const squawkCount = useStore((s) => s.activeSquawks.length)
   const strictMode = useStore((s) => s.strictMode)
   const finishFlight = useStore((s) => s.finishFlight)
   const abortFlight = useStore((s) => s.abortFlight)
@@ -69,6 +71,7 @@ export default function ActiveFlight() {
   const gearUpRef = useRef(false)
   const gearDownRef = useRef(false)
   const soundOnRef = useRef(true)
+  const armedRef = useRef(false)
 
   const aircraft = aircraftById(active.aircraftId)
   const livery = liveryById(active.liveryId)
@@ -90,6 +93,10 @@ export default function ActiveFlight() {
   const [paused, setPaused] = useState(false)
   const [pure, setPure] = useState(false)
   const [soundPanel, setSoundPanel] = useState(false)
+  const [squawkOpen, setSquawkOpen] = useState(false)
+  const [squawkText, setSquawkText] = useState('')
+  const [armed, setArmed] = useState(false)
+  const [throttle, setThrottle] = useState(0)
   const [followMode, setFollowMode] = useState<FollowMode>(followPref)
   const [distractions, setDistractions] = useState(0)
   const [showBanner, setShowBanner] = useState(false)
@@ -115,12 +122,21 @@ export default function ActiveFlight() {
     doneRef.current = false
     gearUpRef.current = false
     gearDownRef.current = false
+    armedRef.current = false
+    setArmed(false)
+    setThrottle(0)
     setPaused(false)
     setRemaining(duration)
     setPct(0)
     setPhase('roll')
 
     const tick = (now: number) => {
+      if (!armedRef.current) {
+        // engines idle at the threshold until you advance the throttle
+        startRef.current = now
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
       if (startRef.current === 0) startRef.current = now
       if (!pausedRef.current) {
         const elapsedMs = now - startRef.current - pausedAccum.current
@@ -232,6 +248,23 @@ export default function ActiveFlight() {
     else pausedAccum.current += performance.now() - pauseStart.current
   }
 
+  const onThrottle = (level: number) => {
+    setThrottle(level)
+    if (soundOnRef.current) throttleTone(level)
+    if (level >= 0.98 && !armedRef.current) {
+      armedRef.current = true
+      setArmed(true)
+      throttleToneStop()
+      if ('vibrate' in navigator) navigator.vibrate?.(30)
+    }
+  }
+
+  const submitSquawk = () => {
+    addSquawk(squawkText)
+    setSquawkText('')
+    setSquawkOpen(false)
+  }
+
   const onCancel = () => {
     const elapsed = duration - remaining
     const frac = duration > 0 ? elapsed / duration : 0
@@ -243,6 +276,11 @@ export default function ActiveFlight() {
 
   // jump to the final minute to preview the landing (keeps the session valid)
   const skipToLanding = () => {
+    if (!armedRef.current) {
+      armedRef.current = true
+      setArmed(true)
+      throttleToneStop()
+    }
     const targetSec = Math.max(0, duration - 60)
     if (pausedRef.current) {
       setPaused(false)
@@ -333,10 +371,39 @@ export default function ActiveFlight() {
             >
               {soundOn ? <IconSoundOn /> : <IconSoundOff />}
             </button>
+            <button
+              className={`ios-btn relative ${squawkOpen ? 'ios-btn--active' : ''}`}
+              aria-label="Squawk noteren"
+              onClick={() => setSquawkOpen((v) => !v)}
+            >
+              <IconWrench />
+              {squawkCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-amber-400 text-black text-[10px] font-bold grid place-items-center">
+                  {squawkCount}
+                </span>
+              )}
+            </button>
             <button className="ios-btn" aria-label="Pure modus" onClick={() => setPure(true)}>
               <IconMoon />
             </button>
           </div>
+
+          {squawkOpen && (
+            <div className="absolute top-[232px] right-[70px] z-20 w-64 glass rounded-2xl p-3 animate-fade-in">
+              <p className="avlabel uppercase tracking-[0.12em] mb-2">Squawk — parkeer je gedachte</p>
+              <input
+                autoFocus
+                value={squawkText}
+                onChange={(e) => setSquawkText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitSquawk()}
+                placeholder="bijv. mail Tim terugsturen"
+                className="w-full rounded-xl bg-white/[0.08] border border-white/10 px-3 py-2.5 text-[13px] outline-none focus:border-white/30 placeholder:text-white/30"
+              />
+              <button onClick={submitSquawk} className="btn-primary w-full mt-2 !py-2 text-[13px]">
+                Noteer in het technisch logboek
+              </button>
+            </div>
+          )}
 
           {soundPanel && (
             <div className="absolute top-[178px] right-[70px] z-20 w-60 glass rounded-2xl overflow-hidden animate-fade-in">
@@ -430,6 +497,10 @@ export default function ActiveFlight() {
         </>
       )}
 
+      {!armed && !pure && (
+        <ThrottleLever value={throttle} onChange={onThrottle} />
+      )}
+
       {pure && (
         <button onClick={() => setPure(false)} className="absolute inset-0 z-10 grid place-items-center">
           <div className="text-center [text-shadow:0_2px_12px_rgba(0,0,0,0.8)]">
@@ -438,6 +509,67 @@ export default function ActiveFlight() {
           </div>
         </button>
       )}
+    </div>
+  )
+}
+
+
+/** vertical throttle: drag the lever to TO/GA to start the roll */
+function ThrottleLever({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+
+  const fromEvent = (clientY: number) => {
+    const el = trackRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const raw = 1 - (clientY - r.top) / r.height
+    // detents at IDLE / CLB / TO-GA
+    const v = Math.max(0, Math.min(1, raw))
+    const snapped = v > 0.9 ? 1 : v > 0.44 && v < 0.56 ? 0.5 : v
+    onChange(snapped)
+  }
+
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-30 pb-8 pt-16 bg-gradient-to-t from-black/80 via-black/40 to-transparent grid place-items-center pointer-events-none">
+      <div className="pointer-events-auto flex items-end gap-5">
+        <div className="text-right pb-2 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">
+          <p className="font-serif text-[19px] font-semibold leading-snug">Geef zelf gas</p>
+          <p className="text-[12px] text-white/55 mt-0.5 max-w-[11rem]">
+            Duw de hendel naar TO/GA om je focusvlucht te starten
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-1.5">
+          <span className={`avlabel ${value >= 0.98 ? 'text-emerald-300' : ''}`}>TO/GA</span>
+          <div
+            ref={trackRef}
+            className="relative w-14 h-44 rounded-2xl bg-black/60 border border-white/15 touch-none cursor-grab active:cursor-grabbing"
+            onPointerDown={(e) => {
+              dragging.current = true
+              e.currentTarget.setPointerCapture(e.pointerId)
+              fromEvent(e.clientY)
+            }}
+            onPointerMove={(e) => dragging.current && fromEvent(e.clientY)}
+            onPointerUp={() => (dragging.current = false)}
+          >
+            {/* detent-strepen */}
+            <div className="absolute inset-x-3 top-[8%] h-px bg-white/25" />
+            <div className="absolute inset-x-3 top-1/2 h-px bg-white/25" />
+            <div className="absolute inset-x-3 bottom-[8%] h-px bg-white/25" />
+            {/* hendel */}
+            <div
+              className="absolute inset-x-1.5 h-10 rounded-xl bg-gradient-to-b from-white to-white/75 shadow-lg transition-[top] duration-75"
+              style={{ top: `calc(${(1 - value) * 84 + 4}% - 0px)` }}
+            >
+              <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 space-y-1">
+                <div className="h-0.5 rounded bg-black/25" />
+                <div className="h-0.5 rounded bg-black/25" />
+              </div>
+            </div>
+          </div>
+          <span className="avlabel">IDLE</span>
+        </div>
+      </div>
     </div>
   )
 }

@@ -430,3 +430,24 @@ body {
 }
 .ticket-notch::before { left: -9px; }
 .ticket-notch::after { right: -9px; }
+
+/* light suede wallet, like the reference photo */
+.leather-light {
+  position: relative;
+  background:
+    radial-gradient(130% 90% at 30% 0%, rgba(255, 255, 255, 0.16), transparent 55%),
+    repeating-linear-gradient(21deg, rgba(0, 0, 0, 0.05) 0 2px, rgba(255, 255, 255, 0.03) 2px 5px),
+    repeating-linear-gradient(-33deg, rgba(0, 0, 0, 0.04) 0 3px, rgba(255, 255, 255, 0.02) 3px 7px),
+    linear-gradient(160deg, #b9b6b0 0%, #a3a09a 55%, #8e8b85 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -8px 18px rgba(0, 0, 0, 0.22),
+    0 22px 44px -18px rgba(0, 0, 0, 0.85);
+}
+.leather-light .leather-stitch {
+  border-color: rgba(70, 64, 56, 0.35);
+}
+.leather-light .leather-emboss {
+  color: rgba(60, 55, 48, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}

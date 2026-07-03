@@ -20,7 +20,7 @@ const BASE = 'https://rfinder.asalink.net/free/'
 
 const homeIata = process.argv[2] || 'AMS'
 const limit = Number(process.argv[3] || Infinity)
-const DELAY_MS = 1800
+const DELAY_MS = 6000
 
 const airports = JSON.parse(readFileSync(join(ROOT, 'src/data/airports.json'), 'utf8'))
 const byIata = new Map(airports.map((r) => [r[0], r]))
@@ -106,7 +106,11 @@ function distKm(lat1, lon1, lat2, lon2) {
   return 2 * 6371 * Math.asin(Math.sqrt(s))
 }
 
-const big = airports.filter((r) => r[7] === 1 && r[1] && r[0] !== homeIata)
+// only genuinely large fields: big flag AND a runway of at least 2400 m
+const runways = JSON.parse(readFileSync(join(ROOT, 'src/data/runways.json'), 'utf8'))
+const big = airports.filter(
+  (r) => r[7] === 1 && r[1] && r[0] !== homeIata && (runways[r[0]]?.lengthM ?? 0) >= 2400,
+)
 const pairs = []
 for (const b of big) {
   if (!routes[`${homeIata}-${b[0]}`]) pairs.push([home, b])
@@ -118,6 +122,7 @@ await refreshSession()
 let ok = 0
 let fail = 0
 let done = 0
+let dryStreak = 0
 for (const [dep, arr] of pairs) {
   if (done >= limit) break
   done++
@@ -128,13 +133,19 @@ for (const [dep, arr] of pairs) {
     if (wps) {
       routes[key] = wps
       ok++
+      dryStreak = 0
       if (ok % 20 === 0) {
         writeFileSync(ROUTES_PATH, JSON.stringify(routes))
         console.log(`[${done}/${pairs.length}] saved — ${ok} ok, ${fail} failed (last: ${key}, ${wps.length} wps)`)
       }
     } else {
       fail++
+      dryStreak++
       if (fail <= 5 || fail % 50 === 0) console.log(`[${done}] ${key} -> no valid route`)
+      if (dryStreak >= 25) {
+        console.log('25 consecutive invalid responses — the service is throttling us. Stopping politely; rerun later.')
+        break
+      }
     }
   } catch (e) {
     fail++

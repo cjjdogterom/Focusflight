@@ -381,3 +381,79 @@ export function playGear(direction: 'up' | 'down') {
 
   window.setTimeout(() => void c.close(), (dur + 0.6) * 1000)
 }
+
+/** short paper-tear ripple for the boarding-pass stub */
+export function playTear() {
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  const c = new AC()
+  const out = c.createGain()
+  out.gain.value = 0.5
+  out.connect(c.destination)
+  const t = c.currentTime
+  const dur = 0.42
+  const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < data.length; i++) {
+    // bursty crackle that densifies along the tear
+    const p = i / data.length
+    data[i] = (Math.random() * 2 - 1) * (Math.random() < 0.25 + p * 0.5 ? 1 : 0.15)
+  }
+  const src = c.createBufferSource()
+  src.buffer = buf
+  const bp = c.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.setValueAtTime(1100, t)
+  bp.frequency.exponentialRampToValueAtTime(2600, t + dur)
+  bp.Q.value = 0.8
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(0.55, t + 0.05)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  src.connect(bp).connect(g).connect(out)
+  src.start(t)
+  src.stop(t + dur)
+  window.setTimeout(() => void c.close(), (dur + 0.3) * 1000)
+}
+
+// ---- throttle: a continuous engine tone that follows the lever ----
+let thrCtx: AudioContext | null = null
+let thrOsc: OscillatorNode | null = null
+let thrGain: GainNode | null = null
+
+export function throttleTone(level: number) {
+  // level 0..1 — spool the engines up with the lever
+  if (!thrCtx) {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    thrCtx = new AC()
+    thrOsc = thrCtx.createOscillator()
+    thrOsc.type = 'sawtooth'
+    const lp = thrCtx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 420
+    thrGain = thrCtx.createGain()
+    thrGain.gain.value = 0
+    thrOsc.connect(lp).connect(thrGain).connect(thrCtx.destination)
+    thrOsc.frequency.value = 55
+    thrOsc.start()
+  }
+  const t = thrCtx.currentTime
+  thrOsc!.frequency.setTargetAtTime(55 + level * 130, t, 0.12)
+  thrGain!.gain.setTargetAtTime(level * 0.16, t, 0.1)
+}
+
+export function throttleToneStop() {
+  if (!thrCtx) return
+  const c = thrCtx
+  thrGain?.gain.setTargetAtTime(0, c.currentTime, 0.2)
+  window.setTimeout(() => {
+    try {
+      thrOsc?.stop()
+    } catch {
+      /* fine */
+    }
+    void c.close()
+  }, 700)
+  thrCtx = null
+  thrOsc = null
+  thrGain = null
+}

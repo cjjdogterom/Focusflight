@@ -85,4 +85,6 @@ export interface FlightLogEntry {
   completed: boolean
   startedAt: number
   endedAt: number
+  /** intrusive thoughts parked during the flight, like tech-log squawks */
+  squawks?: string[]
 }

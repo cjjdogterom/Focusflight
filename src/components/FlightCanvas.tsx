@@ -2,10 +2,11 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { Route, RouteWaypoint } from '../lib/routeEngine'
 import type { RunwayInfo } from '../lib/runwayGeo'
 import type { Aircraft, Livery } from '../types'
-import { positionAt, indexAtFraction, bearing, type LngLat } from '../lib/geo'
+import { positionAt, indexAtFraction, bearing, greatCirclePoints, type LngLat } from '../lib/geo'
 import { buildPlaneSVG } from './AircraftSVG'
 import { Plane3D } from './Plane3D'
 import { WORLD_LAND } from '../data/worldLand'
+import { AIRPORTS } from '../data/airports'
 
 export type FollowMode = 'off' | 'north' | 'track'
 
@@ -657,6 +658,8 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
       dot(0, -ph * 0.05, pw * 0.018, '255,40,40', Math.max(0, bp) ** 3 * 0.45)
     }
 
+    drawTraffic(ctx, w, h)
+
     const planePx = 50 * (aircraft.scale || 1)
 
     // aircraft (3D; heading relative to the rotated map)
@@ -698,6 +701,83 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
     }
 
     if (chart) drawFurniture(ctx, w, h)
+  }
+
+  // ---- living airspace: scheduled KLM traffic crossing the map ----
+  // deterministic per hour-of-day, so the sky has its own timetable
+  const trafficPlan = useRef<{ a: LngLat; b: LngLat; callsign: string; t0: number; durMs: number }[] | null>(null)
+  const buildTraffic = () => {
+    const big = (AIRPORTS as { lon: number; lat: number; big?: boolean }[]).filter((x) => x.big)
+    const mulberry = (seed: number) => () => {
+      seed |= 0
+      seed = (seed + 0x6d2b79f5) | 0
+      let z = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+      z = (z + Math.imul(z ^ (z >>> 7), 61 | z)) ^ z
+      return ((z ^ (z >>> 14)) >>> 0) / 4294967296
+    }
+    const hourBlock = Math.floor(Date.now() / 3_600_000)
+    const plan: { a: LngLat; b: LngLat; callsign: string; t0: number; durMs: number }[] = []
+    for (let i = 0; i < 14; i++) {
+      const rnd = mulberry(hourBlock * 97 + i * 13)
+      const fa = big[Math.floor(rnd() * big.length)]
+      const fb = big[Math.floor(rnd() * big.length)]
+      if (!fa || !fb || fa === fb) continue
+      const distKm = Math.hypot((fb.lon - fa.lon) * 78, (fb.lat - fa.lat) * 111)
+      const durMs = Math.max(0.4, distKm / 850) * 3_600_000
+      plan.push({
+        a: [fa.lon, fa.lat],
+        b: [fb.lon, fb.lat],
+        callsign: `KL${100 + Math.floor(rnd() * 899)}`,
+        t0: hourBlock * 3_600_000 - rnd() * durMs * 0.9,
+        durMs,
+      })
+    }
+    return plan
+  }
+  const drawTraffic = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    if (!trafficPlan.current) trafficPlan.current = buildTraffic()
+    const now = Date.now()
+    ctx.save()
+    ctx.font = '600 9px -apple-system, system-ui, sans-serif'
+    for (const f of trafficPlan.current) {
+      const tt = (now - f.t0) / f.durMs
+      if (tt <= 0.02 || tt >= 0.98) continue
+      const pts = greatCirclePoints(f.a, f.b, 24)
+      const { pos, heading } = positionAt(pts, tt)
+      const [x, y] = project(pos[0], pos[1])
+      if (x < -30 || x > w + 30 || y < -30 || y > h + 30) continue
+      const rot = (heading + rotCur.current / D2R) * D2R
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.rotate(rot)
+      ctx.globalAlpha = 0.62
+      ctx.fillStyle = '#dfe8f2'
+      // klein verkeers-silhouet
+      ctx.beginPath()
+      ctx.moveTo(0, -6)
+      ctx.lineTo(1.6, -1)
+      ctx.lineTo(6, 1.8)
+      ctx.lineTo(6, 3.1)
+      ctx.lineTo(1.2, 2)
+      ctx.lineTo(1, 4.6)
+      ctx.lineTo(2.6, 5.8)
+      ctx.lineTo(2.6, 6.7)
+      ctx.lineTo(-2.6, 6.7)
+      ctx.lineTo(-2.6, 5.8)
+      ctx.lineTo(-1, 4.6)
+      ctx.lineTo(-1.2, 2)
+      ctx.lineTo(-6, 3.1)
+      ctx.lineTo(-6, 1.8)
+      ctx.lineTo(-1.6, -1)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
+      ctx.globalAlpha = 0.55
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'
+      ctx.fillText(f.callsign, x + 9, y - 6)
+      ctx.globalAlpha = 1
+    }
+    ctx.restore()
   }
 
   const drawFurniture = (ctx: CanvasRenderingContext2D, w: number, h: number) => {

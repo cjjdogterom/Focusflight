@@ -183,6 +183,22 @@ export default function FlightLog() {
                     <IconX size={13} />
                   </button>
                 </div>
+
+                {f.squawks && f.squawks.length > 0 && (
+                  <div className="px-5 pb-4 -mt-1">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-white/35 mb-1.5">
+                      Squawks
+                    </p>
+                    <ul className="space-y-1">
+                      {f.squawks.map((q, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[12.5px] text-white/65">
+                          <span className="mt-[6px] w-1 h-1 rounded-full bg-amber-400/80 shrink-0" />
+                          {q}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </div>

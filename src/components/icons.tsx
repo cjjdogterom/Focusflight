@@ -181,3 +181,10 @@ export const IconPassport = ({ size = 20, className }: IconProps) =>
       <path d="M9.2 16.5h5.6" />
     </>,
   )
+
+export const IconWrench = ({ size = 20, className }: IconProps) =>
+  base(
+    size,
+    className,
+    <path d="M14.5 6.5a4 4 0 0 0-5.6 4.6L4 16l-1 3 3-1 4.9-4.9a4 4 0 0 0 4.6-5.6l-2.6 2.6-2-.5-.5-2 2.6-2.6Z" />,
+  )

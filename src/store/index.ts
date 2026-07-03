@@ -31,6 +31,8 @@ export type Screen =
   | 'trends'
 
 export interface BookingDraft {
+  /** departure override — null means home base / transit position */
+  originIata: string | null
   destinationIata: string | null
   aircraftId: string
   liveryId: string
@@ -77,6 +79,8 @@ interface State {
   newStamp: string | null
   /** certificate ids earned (or improved) on the most recent landing */
   newCertIds: string[]
+  /** intrusive thoughts parked during the current flight */
+  activeSquawks: string[]
 
   flights: FlightLogEntry[]
   totalMiles: number
@@ -100,6 +104,9 @@ interface State {
   finishFlight: (completedSec: number, fraction: number) => Promise<void>
   abortFlight: (completedSec: number, fraction: number) => Promise<void>
   removeFlight: (id: string) => Promise<void>
+  addSquawk: (text: string) => void
+  /** effective departure: booking override, else transit position / home */
+  getBookingOrigin: () => string | null
 }
 
 function seatCode(): string {
@@ -115,6 +122,7 @@ function flightNo(): string {
 }
 
 const DEFAULT_BOOKING: BookingDraft = {
+  originIata: null,
   destinationIata: null,
   aircraftId: STANDARD.id, // fixed standard aircraft (never shown)
   liveryId: LIVERIES[0].id, // KLM
@@ -139,6 +147,7 @@ export const useStore = create<State>((set, get) => ({
   newCardId: null,
   newStamp: null,
   newCertIds: [],
+  activeSquawks: [],
 
   flights: [],
   totalMiles: 0,
@@ -210,10 +219,21 @@ export const useStore = create<State>((set, get) => ({
     return last?.toIata ?? s.homeIata
   },
 
+  getBookingOrigin: () => {
+    const s = get()
+    return s.booking.originIata ?? s.getOrigin()
+  },
+
+  addSquawk: (text) => {
+    const t = text.trim()
+    if (!t) return
+    set((s) => ({ activeSquawks: [...s.activeSquawks, t].slice(0, 20) }))
+  },
+
   updateBooking: (patch) => set((s) => ({ booking: { ...s.booking, ...patch } })),
 
   pickRandomDestination: () => {
-    const home = get().getOrigin()
+    const home = get().getBookingOrigin()
     const pool = AIRPORTS.filter((a) => a.iata !== home)
     const dest = pool[Math.floor(Math.random() * pool.length)]
     set((s) => ({ booking: { ...s.booking, destinationIata: dest.iata } }))
@@ -227,7 +247,7 @@ export const useStore = create<State>((set, get) => ({
 
   beginFlight: async () => {
     const { booking, boarding } = get()
-    const from = airportByIata(get().getOrigin() ?? '')
+    const from = airportByIata(get().getBookingOrigin() ?? '')
     const to = booking.destinationIata ? airportByIata(booking.destinationIata) : undefined
     if (!from || !to) return
     const info = boarding ?? { seat: seatCode(), gate: gateCode(), flightNo: flightNo() }
@@ -250,11 +270,11 @@ export const useStore = create<State>((set, get) => ({
       gate: info.gate,
       flightNo: info.flightNo,
     }
-    set({ active, screen: 'flying' })
+    set({ active, screen: 'flying', activeSquawks: [] })
   },
 
   finishFlight: async (completedSec, fraction) => {
-    const { active } = get()
+    const { active, activeSquawks } = get()
     if (!active) return
     const miles = milesFor(active.route.distanceKm, fraction)
     const entry: FlightLogEntry = {
@@ -273,6 +293,7 @@ export const useStore = create<State>((set, get) => ({
       completed: true,
       startedAt: active.startedAtMs,
       endedAt: Date.now(),
+      squawks: activeSquawks.length ? activeSquawks : undefined,
     }
     await saveFlight(entry)
     set((s) => {
@@ -304,7 +325,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   abortFlight: async (completedSec, fraction) => {
-    const { active } = get()
+    const { active, activeSquawks } = get()
     if (!active) return
     const miles = milesFor(active.route.distanceKm, fraction * 0.5) // half credit for a diverted flight
     const entry: FlightLogEntry = {
@@ -323,6 +344,7 @@ export const useStore = create<State>((set, get) => ({
       completed: false,
       startedAt: active.startedAtMs,
       endedAt: Date.now(),
+      squawks: activeSquawks.length ? activeSquawks : undefined,
     }
     await saveFlight(entry)
     set((s) => ({

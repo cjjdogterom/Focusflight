@@ -18,6 +18,7 @@ export default function Collection() {
   const next = nextCard(totalMiles)
   const progress = next ? ((totalMiles - active.kmMin) / (next.kmMin - active.kmMin)) * 100 : 100
   const [cardOut, setCardOut] = useState(false)
+  const [infoCard, setInfoCard] = useState<MembershipCard | null>(null)
 
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
@@ -29,28 +30,48 @@ export default function Collection() {
           <h1 className="text-[22px] font-bold tracking-tight">Membership</h1>
         </div>
 
-        {/* active card in its leather wallet — tap to slide it out */}
+        {/* active card in its light-suede wallet — tap to slide it out */}
         <div>
           <button
             onClick={() => setCardOut((v) => !v)}
             className="block w-full text-left"
             aria-label={cardOut ? 'Kaart terugsteken' : 'Kaart uit de portemonnee halen'}
           >
-            <div className="relative pt-2 pb-1 overflow-visible">
-              {/* the card, tucked into the pocket */}
-              <div className={`wallet-card ${cardOut ? 'wallet-card--out' : ''} relative z-0 px-3`}>
-                <Card card={active} large />
+            <div className="leather-light relative rounded-[26px] aspect-[1.75] overflow-hidden">
+              <div className="leather-stitch !inset-2.5 !rounded-[20px]" />
+              {/* the card in the right-hand slot */}
+              <div
+                className="absolute right-[4.5%] top-1/2 w-[58%] transition-transform duration-500"
+                style={{
+                  transform: cardOut
+                    ? 'translateY(-50%) translateX(26%) rotate(1.5deg)'
+                    : 'translateY(-50%)',
+                }}
+              >
+                <Card card={active} />
               </div>
-              {/* the stitched leather pocket over the lower half */}
-              <div className="leather relative z-10 -mt-[34%] h-44 rounded-2xl">
-                <div className="leather-stitch" />
-                <div className="absolute inset-x-0 bottom-5 text-center">
-                  <p className="leather-emboss text-[12px] uppercase">FocusFlight Club</p>
-                  <p className="text-[10px] text-white/25 mt-1.5">
-                    {cardOut ? 'tik om terug te steken' : 'tik om je kaart te pakken'}
-                  </p>
-                </div>
+              {/* left suede panel overlapping the card edge, with the seam */}
+              <div
+                className="leather-light absolute left-0 inset-y-0 w-[44%] rounded-r-[26px]"
+                style={{ boxShadow: '8px 0 16px -6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35)' }}
+              >
+                <div
+                  className="absolute inset-y-2.5 right-2 border-r-[1.5px] border-dashed"
+                  style={{ borderColor: 'rgba(70,64,56,0.35)' }}
+                />
+                <p className="leather-emboss absolute left-6 top-7 text-[15px] uppercase leading-snug">
+                  FocusFlight
+                  <br />
+                  Club
+                </p>
+                <IconPlane
+                  size={20}
+                  className="absolute left-6 bottom-6 text-black/30 [filter:drop-shadow(0_1px_0_rgba(255,255,255,0.3))]"
+                />
               </div>
+              <p className="absolute right-5 bottom-3.5 text-[10px] text-black/35">
+                {cardOut ? 'tik om terug te steken' : 'tik om je kaart te pakken'}
+              </p>
             </div>
           </button>
           <div className="mt-5">
@@ -90,12 +111,19 @@ export default function Collection() {
             {MEMBERSHIP_CARDS.map((c) => {
               const unlocked = totalMiles >= c.kmMin
               return (
-                <div key={c.id} className={unlocked ? '' : 'opacity-40 grayscale'}>
+                <button
+                  key={c.id}
+                  onClick={() => setInfoCard(c)}
+                  className={`text-left active:scale-[0.98] transition-transform ${
+                    unlocked ? '' : 'opacity-40 grayscale'
+                  }`}
+                  aria-label={`Over de ${c.name}-kaart`}
+                >
                   <Card card={c} />
                   <p className="text-[11px] text-white/45 mt-1.5 px-0.5">
                     {unlocked ? 'In je collectie' : `Vanaf ${c.kmMin.toLocaleString('nl-NL')} km`}
                   </p>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -131,6 +159,35 @@ export default function Collection() {
         )}
 
       </div>
+
+      {/* card info sheet */}
+      {infoCard && (
+        <button
+          onClick={() => setInfoCard(null)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm grid place-items-end sm:place-items-center p-4 text-left animate-fade-in"
+          aria-label="Sluiten"
+        >
+          <div className="w-full max-w-md card-reveal" onClick={(e) => e.stopPropagation()}>
+            <div className="card p-5 rounded-3xl">
+              <Card card={infoCard} large />
+              <h2 className="font-serif text-[24px] font-semibold mt-5 leading-snug">
+                {infoCard.name}
+              </h2>
+              <p className="font-serif text-[15px] text-white/75 leading-relaxed mt-2">
+                {infoCard.story}
+              </p>
+              <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-white/10">
+                <span className="text-[13px] text-white/55">{infoCard.perk}</span>
+                <span className="text-[13px] font-semibold tabular-nums">
+                  {totalMiles >= infoCard.kmMin
+                    ? 'In je collectie'
+                    : `nog ${(infoCard.kmMin - totalMiles).toLocaleString('nl-NL')} km`}
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
+      )}
     </div>
   )
 }

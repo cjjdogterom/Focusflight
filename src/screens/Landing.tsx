@@ -83,6 +83,24 @@ export default function Landing() {
           </div>
         )}
 
+        {/* parked thoughts return as tech-log items */}
+        {result.squawks && result.squawks.length > 0 && (
+          <div className="w-full card p-5">
+            <p className="avlabel uppercase tracking-[0.12em] mb-2">Technisch logboek — squawks</p>
+            <ul className="space-y-1.5">
+              {result.squawks.map((q, i) => (
+                <li key={i} className="flex items-start gap-2 text-[14px] text-white/80">
+                  <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  {q}
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-white/40 mt-3">
+              Geparkeerd tijdens de vlucht — nu is er tijd voor.
+            </p>
+          </div>
+        )}
+
         {/* new passport stamp */}
         {newStamp && (
           <button
