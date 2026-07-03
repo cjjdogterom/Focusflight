@@ -7,7 +7,7 @@
 // long straight final and a roll-out that stops ON the runway.
 
 import type { Airport } from '../types'
-import { distanceKm, type LngLat } from './geo'
+import { bearing, distanceKm, type LngLat } from './geo'
 import runwaysData from '../data/runways.json'
 
 const RUNWAYS = runwaysData as Record<string, { lengthM: number; ident: string }>
@@ -22,6 +22,19 @@ export interface RunwayInfo {
   /** far end of the strip */
   end: LngLat
   lengthM: number
+  /** surveyed geometry: the strip in the satellite imagery IS this runway */
+  real?: boolean
+}
+
+// Surveyed runway ends for selected airports — the aircraft rolls on the
+// actual runway visible in the satellite imagery, so no synthetic strip is
+// drawn for these. Source: OurAirports runways.csv (public domain).
+const REAL_RUNWAYS: Record<string, [{ ident: string; lat: number; lon: number }, { ident: string; lat: number; lon: number }]> = {
+  // Schiphol — Polderbaan (18R/36L), 3800 m
+  AMS: [
+    { ident: '18R', lat: 52.362701, lon: 4.71193 },
+    { ident: '36L', lat: 52.328602, lon: 4.70884 },
+  ],
 }
 
 // local flat-earth offsets — plenty accurate at runway/approach scales
@@ -62,6 +75,27 @@ function parseEnds(ident: string): { headingDeg: number; ident: string }[] {
 
 /** the runway end best aligned with the desired course, or null without data */
 export function runwayFor(airport: Airport, courseDeg: number): RunwayInfo | null {
+  const surveyed = REAL_RUNWAYS[airport.iata]
+  if (surveyed) {
+    const [e0, e1] = surveyed
+    const cands = [
+      { from: e0, to: e1 },
+      { from: e1, to: e0 },
+    ].map((c) => {
+      const threshold: LngLat = [c.from.lon, c.from.lat]
+      const end: LngLat = [c.to.lon, c.to.lat]
+      return {
+        ident: c.from.ident,
+        headingDeg: bearing(threshold, end),
+        threshold,
+        end,
+        lengthM: Math.round(distanceKm(threshold, end) * 1000),
+        real: true,
+      }
+    })
+    cands.sort((x, y) => angDiff(x.headingDeg, courseDeg) - angDiff(y.headingDeg, courseDeg))
+    return cands[0]
+  }
   const data = RUNWAYS[airport.iata]
   if (!data || !data.lengthM) return null
   const ends = parseEnds(data.ident)

@@ -446,8 +446,8 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
       }
       ctx.restore()
     }
-    if (route.runways?.dep) drawRunwayStrip(route.runways.dep)
-    if (route.runways?.arr) drawRunwayStrip(route.runways.arr)
+    if (route.runways?.dep && !route.runways.dep.real) drawRunwayStrip(route.runways.dep)
+    if (route.runways?.arr && !route.runways.arr.real) drawRunwayStrip(route.runways.arr)
 
     // ---- planned route ----
     if (chart) {
