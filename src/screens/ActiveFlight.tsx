@@ -3,9 +3,8 @@ import { useStore } from '../store'
 import FlightCanvas, { type FlightCanvasHandle, type FollowMode } from '../components/FlightCanvas'
 import {
   IconSoundOn, IconSoundOff, IconFollow, IconTrackUp, IconExpand, IconMoon,
-  IconPause, IconPlay, IconX, IconGlobe, IconLayers,
+  IconPause, IconPlay, IconX, IconLayers,
 } from '../components/icons'
-import GlobeView, { type GlobeHandle, type GlobeRoute } from '../components/GlobeView'
 import { aircraftById } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
 import { buildProfile, type FlightProfile } from '../lib/profile'
@@ -14,9 +13,6 @@ import { startAmbience, stopAmbience, SOUNDSCAPES } from '../lib/audio'
 import runwaysData from '../data/runways.json'
 
 const RUNWAYS = runwaysData as Record<string, { lengthM: number; ident: string }>
-
-// stable empty list: the in-flight globe only shows the active route
-const NO_ROUTES: GlobeRoute[] = []
 
 const PHASE_NL: Record<string, string> = {
   roll: 'Startrol',
@@ -61,7 +57,6 @@ export default function ActiveFlight() {
   const setFollowPref = useStore((s) => s.setFollowPref)
 
   const mapRef = useRef<FlightCanvasHandle>(null)
-  const globeRef = useRef<GlobeHandle>(null)
   const rafRef = useRef<number>(0)
   const startRef = useRef<number>(0)
   const pausedAccum = useRef<number>(0)
@@ -91,7 +86,6 @@ export default function ActiveFlight() {
   const [pct, setPct] = useState(0)
   const [paused, setPaused] = useState(false)
   const [pure, setPure] = useState(false)
-  const [viewMode, setViewMode] = useState<'map' | 'globe'>('globe')
   const [soundPanel, setSoundPanel] = useState(false)
   const [followMode, setFollowMode] = useState<FollowMode>(followPref)
   const [distractions, setDistractions] = useState(0)
@@ -129,7 +123,6 @@ export default function ActiveFlight() {
         const distFrac = profile.distFrac(tSec)
         const dyn = profile.telemetry(tSec)
         mapRef.current?.update(distFrac, dyn.altitudeM)
-        globeRef.current?.setProgress(distFrac)
 
         const remain = Math.max(0, Math.ceil(duration - tSec))
         if (remain !== lastRemain.current) {
@@ -229,26 +222,15 @@ export default function ActiveFlight() {
 
   return (
     <div className="relative h-full w-full select-none">
-      {viewMode === 'map' ? (
-        <FlightCanvas
-          ref={mapRef}
-          route={active.route}
-          aircraft={aircraft}
-          livery={livery}
-          followMode={followMode}
-          mapStyle={mapStyle}
-          onUserInteract={() => setFollowMode('off')}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-[#04070d]">
-          <GlobeView
-            ref={globeRef}
-            routes={NO_ROUTES}
-            flightPoints={active.route.points}
-            mapStyle={mapStyle}
-          />
-        </div>
-      )}
+      <FlightCanvas
+        ref={mapRef}
+        route={active.route}
+        aircraft={aircraft}
+        livery={livery}
+        followMode={followMode}
+        mapStyle={mapStyle}
+        onUserInteract={() => setFollowMode('off')}
+      />
 
       {/* readability gradients, no boxes (reference style) */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/55 to-transparent" />
@@ -273,23 +255,14 @@ export default function ActiveFlight() {
             <p className="text-[12px] text-white/60 mt-0.5">
               {PHASE_NL[phase] ?? phase}
               {procedures?.sid && procedures?.star ? ` · ${procedures.sid} → ${procedures.star}` : ''} · RWY{' '}
-              {depRwy.ident}
+              {['descent', 'landing', 'arrived'].includes(phase)
+                ? active.route.runways?.arr?.ident ?? arrRwy.ident
+                : active.route.runways?.dep?.ident ?? depRwy.ident}
             </p>
             <p className="font-mono text-[11px] text-white/45 mt-0.5 tabular-nums">
               {tel.speedKmh} km/u · {tel.altitudeM.toLocaleString('nl-NL')} m ·{' '}
               {String(tel.heading).padStart(3, '0')}°
             </p>
-          </div>
-
-          {/* globe view toggle, top-left like the reference */}
-          <div className="absolute left-0 top-24 p-4 animate-fade-in">
-            <button
-              className={`ios-btn ${viewMode === 'globe' ? 'ios-btn--active' : ''}`}
-              aria-label="Globe"
-              onClick={() => setViewMode((v) => (v === 'map' ? 'globe' : 'map'))}
-            >
-              <IconGlobe />
-            </button>
           </div>
 
           {/* iOS map buttons */}

@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import type { Route } from '../lib/routeEngine'
+import type { Route, RouteWaypoint } from '../lib/routeEngine'
+import type { RunwayInfo } from '../lib/runwayGeo'
 import type { Aircraft, Livery } from '../types'
 import { positionAt, bearing, type LngLat } from '../lib/geo'
 import { buildPlaneSVG } from './AircraftSVG'
@@ -411,13 +412,70 @@ const FlightCanvas = forwardRef<FlightCanvasHandle, Props>(function FlightCanvas
       }
     }
 
+    // ---- runway strips (asphalt + centreline + ident) ----
+    const drawRunwayStrip = (rw: RunwayInfo) => {
+      const [x0, y0] = project(rw.threshold[0], rw.threshold[1])
+      const [x1, y1] = project(rw.end[0], rw.end[1])
+      const lenPx = Math.hypot(x1 - x0, y1 - y0)
+      if (lenPx < 8) return
+      const widthPx = Math.max(3.5, lenPx * (60 / rw.lengthM))
+      ctx.save()
+      ctx.lineCap = 'butt'
+      ctx.strokeStyle = '#3a4149'
+      ctx.lineWidth = widthPx
+      ctx.beginPath()
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y1)
+      ctx.stroke()
+      if (lenPx > 40) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+        ctx.lineWidth = Math.max(0.8, widthPx * 0.07)
+        ctx.setLineDash([lenPx * 0.045, lenPx * 0.03])
+        ctx.beginPath()
+        ctx.moveTo(x0, y0)
+        ctx.lineTo(x1, y1)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+      if (lenPx > 90) {
+        ctx.font = `600 ${Math.max(9, Math.min(13, widthPx * 1.4))}px -apple-system, system-ui, sans-serif`
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(rw.ident, x0 - ((x1 - x0) / lenPx) * 16, y0 - ((y1 - y0) / lenPx) * 16)
+      }
+      ctx.restore()
+    }
+    if (route.runways?.dep) drawRunwayStrip(route.runways.dep)
+    if (route.runways?.arr) drawRunwayStrip(route.runways.arr)
+
     // ---- planned route ----
     if (chart) {
-      const vtx: { lon: number; lat: number; seg: string }[] = [
-        { lon: route.from.lon, lat: route.from.lat, seg: 'SID' },
-        ...route.waypoints.map((wp) => ({ lon: wp.lon, lat: wp.lat, seg: wp.segment })),
-        { lon: route.to.lon, lat: route.to.lat, seg: 'STAR' },
-      ]
+      // the planned line follows the real geometry: takeoff roll, climb-out
+      // and final/roll-out come from route.segments; waypoints colour the legs
+      const flat: [number, number][] = []
+      for (const seg of route.segments) flat.push(...seg)
+      const eq = (pt: [number, number], wp: RouteWaypoint) =>
+        Math.abs(pt[0] - wp.lon) < 1e-9 && Math.abs(pt[1] - wp.lat) < 1e-9
+      let head = -1
+      let tail = -1
+      if (route.waypoints.length) {
+        for (let i = 0; i < flat.length && head < 0; i++) {
+          if (route.waypoints.some((wp) => eq(flat[i], wp))) head = i
+        }
+        for (let i = flat.length - 1; i >= 0 && tail < 0; i--) {
+          if (route.waypoints.some((wp) => eq(flat[i], wp))) tail = i
+        }
+      }
+      const vtx: { lon: number; lat: number; seg: string }[] = []
+      if (head >= 0 && tail >= head) {
+        for (let i = 0; i < head; i++) vtx.push({ lon: flat[i][0], lat: flat[i][1], seg: 'SID' })
+        vtx.push(...route.waypoints.map((wp) => ({ lon: wp.lon, lat: wp.lat, seg: wp.segment })))
+        for (let i = tail + 1; i < flat.length; i++)
+          vtx.push({ lon: flat[i][0], lat: flat[i][1], seg: 'STAR' })
+      } else {
+        for (const pt of flat) vtx.push({ lon: pt[0], lat: pt[1], seg: 'ENROUTE' })
+      }
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       ctx.strokeStyle = 'rgba(255,255,255,0.28)'
