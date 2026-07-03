@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
-import { airportByIata, searchAirports } from '../data/airports'
+import { AIRPORTS, airportByIata, searchAirports } from '../data/airports'
 import { STANDARD } from '../data/aircraft'
-import { IconPlane, IconBack } from '../components/icons'
-import DurationMapPicker from '../components/DurationMapPicker'
+import { IconPlane, IconBack, IconCheck } from '../components/icons'
 import { distanceKm } from '../lib/geo'
 import { prefetchRoute } from '../lib/routeFetch'
 import { INTENTS, flightMinutes, formatMinutes } from '../lib/flight'
@@ -28,8 +27,34 @@ export default function Booking() {
 
   const [pickingDest, setPickingDest] = useState(false)
   const [pickingOrigin, setPickingOrigin] = useState(false)
-  const [showDuration, setShowDuration] = useState(false)
   const [targetMin, setTargetMin] = useState(45)
+
+  const flights = useStore((s) => s.flights)
+  // airports you have already visited (departed or landed, completed flights)
+  const visited = useMemo(() => {
+    const set = new Set<string>()
+    for (const f of flights) {
+      if (!f.completed) continue
+      set.add(f.toIata)
+      set.add(f.fromIata)
+    }
+    return set
+  }, [flights])
+
+  // airports whose real flight time matches the focus duration you want
+  const suggestions = useMemo(() => {
+    if (!home) return []
+    const rows: { a: Airport & { big?: boolean }; min: number; diff: number }[] = []
+    for (const a of AIRPORTS as (Airport & { big?: boolean })[]) {
+      if (a.iata === home.iata) continue
+      const d = distanceKm([home.lon, home.lat], [a.lon, a.lat])
+      const min = flightMinutes(d, STANDARD)
+      const diff = Math.abs(min - targetMin)
+      if (diff <= 6) rows.push({ a, min, diff })
+    }
+    rows.sort((x, y) => Number(!!y.a.big) - Number(!!x.a.big) || x.diff - y.diff)
+    return rows.slice(0, 4)
+  }, [home, targetMin, visited])
 
   const dest = booking.destinationIata ? airportByIata(booking.destinationIata) : undefined
   const dist = home && dest ? distanceKm([home.lon, home.lat], [dest.lon, dest.lat]) : 0
@@ -40,6 +65,7 @@ export default function Booking() {
       <DestinationPicker
         home={home}
         title="Waarheen?"
+        visitedSet={visited}
         onBack={() => setPickingDest(false)}
         onPick={(a) => {
           update({ destinationIata: a.iata })
@@ -55,27 +81,11 @@ export default function Booking() {
       <DestinationPicker
         home={home}
         title="Vertrek vanaf?"
+        visitedSet={visited}
         onBack={() => setPickingOrigin(false)}
         onPick={(a) => {
           update({ originIata: a.iata === homeBase ? null : a.iata })
           setPickingOrigin(false)
-        }}
-      />
-    )
-  }
-
-  if (showDuration && home) {
-    return (
-      <DurationMapPicker
-        origin={home}
-        mapStyle={mapStyle}
-        initialMin={targetMin}
-        onClose={() => setShowDuration(false)}
-        onBook={(a) => {
-          update({ destinationIata: a.iata })
-          prefetchRoute(home, a)
-          setShowDuration(false)
-          startBoarding()
         }}
       />
     )
@@ -132,19 +142,59 @@ export default function Booking() {
           </button>
         </div>
 
-        {/* pick by focus duration: opens the map + ruler picker */}
-        <button
-          onClick={() => setShowDuration(true)}
-          className="card p-5 flex items-center justify-between text-left active:scale-[0.99] transition-transform"
-        >
-          <span>
-            <span className="avlabel uppercase tracking-[0.12em] block mb-1">Kies op focusduur</span>
-            <span className="font-semibold text-[15px]">
-              Hoe lang wil je focussen?
-            </span>
-          </span>
-          <span className="text-white/40">›</span>
-        </button>
+        {/* pick by focus duration: slider + matching destinations */}
+        <section>
+          <p className="avlabel uppercase tracking-[0.12em] mb-2.5">Kies op focusduur</p>
+          <div className="card p-5">
+            <div className="flex items-baseline justify-between mb-1.5">
+              <p className="text-[26px] font-bold tracking-tight tabular-nums leading-none">
+                {formatMinutes(targetMin)}
+              </p>
+              <p className="text-[12px] text-white/45">schuif en kies een bestemming</p>
+            </div>
+            <input
+              type="range"
+              min={25}
+              max={720}
+              step={5}
+              value={targetMin}
+              onChange={(e) => setTargetMin(Number(e.target.value))}
+              className="w-full accent-white"
+              aria-label="Focusduur"
+            />
+            <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+              {suggestions.map(({ a, min }) => {
+                const active = booking.destinationIata === a.iata
+                const been = visited.has(a.iata)
+                return (
+                  <button
+                    key={a.iata}
+                    onClick={() => {
+                      update({ destinationIata: a.iata })
+                      if (home) prefetchRoute(home, a)
+                    }}
+                    className={`shrink-0 rounded-xl px-3 py-2 text-left transition active:scale-[0.97] ${
+                      active ? 'bg-white text-black' : 'card'
+                    }`}
+                  >
+                    <IataBadge iata={a.iata} visited={been} active={active} />
+                    <span className="block text-[13px] font-semibold mt-1 max-w-[7rem] truncate">
+                      {a.city}
+                    </span>
+                    <span className={`block text-[11px] ${active ? 'text-black/55' : 'text-white/45'}`}>
+                      {formatMinutes(min)}
+                    </span>
+                  </button>
+                )
+              })}
+              {suggestions.length === 0 && (
+                <p className="text-[12px] text-white/40 py-2">
+                  Geen bestemming op precies deze duur — schuif iets verder.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* aircraft photo preview — no type shown, just the plane */}
         <div className="card px-6 pt-5 pb-5 grid place-items-center overflow-hidden">
@@ -208,11 +258,13 @@ export default function Booking() {
 function DestinationPicker({
   home,
   title = 'Waarheen?',
+  visitedSet,
   onPick,
   onBack,
 }: {
   home: Airport
   title?: string
+  visitedSet: Set<string>
   onPick: (a: Airport) => void
   onBack: () => void
 }) {
@@ -250,12 +302,7 @@ function DestinationPicker({
               onClick={() => onPick(a)}
               className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] active:bg-white/[0.1] transition"
             >
-              <span className="inline-flex items-center gap-1 rounded-md bg-[#ffc800] text-[#0b0d10] font-bold text-[12px] px-1.5 py-0.5 min-w-[52px] justify-center">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5Z" />
-                </svg>
-                {a.iata}
-              </span>
+              <IataBadge iata={a.iata} visited={visitedSet.has(a.iata)} className="min-w-[52px] justify-center" />
               <span className="flex-1 min-w-0">
                 <span className="block truncate font-semibold text-[14px]">{a.city}</span>
                 <span className="block truncate text-[12px] text-white/45">
@@ -282,5 +329,40 @@ function Endpoint({ code, city, align = 'left' }: { code: string; city: string; 
       <p className="text-[26px] font-bold tracking-tight leading-none tabular-nums">{code}</p>
       <p className="text-[12px] text-white/50 truncate max-w-[8rem] mt-1">{city}</p>
     </div>
+  )
+}
+
+
+/** yellow IATA badge; orange outline + check once you have been there */
+export function IataBadge({
+  iata,
+  visited,
+  active = false,
+  className = '',
+}: {
+  iata: string
+  visited: boolean
+  active?: boolean
+  className?: string
+}) {
+  if (visited && !active) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-md border-[1.5px] border-orange-400 text-orange-300 font-bold text-[11px] px-1.5 py-0.5 ${className}`}
+      >
+        <IconCheck size={10} />
+        {iata}
+      </span>
+    )
+  }
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md font-bold text-[11px] px-1.5 py-0.5 ${
+        active ? 'bg-black text-white' : 'bg-[#ffc800] text-[#0b0d10]'
+      } ${className}`}
+    >
+      <IconPlane size={10} />
+      {iata}
+    </span>
   )
 }

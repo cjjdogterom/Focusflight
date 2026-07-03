@@ -361,7 +361,7 @@ export default function ActiveFlight() {
           </div>
 
           {squawkOpen && (
-            <div className="absolute top-[232px] right-[70px] z-20 w-64 glass rounded-2xl p-3 animate-fade-in">
+            <div className="absolute top-[232px] right-[70px] max-w-[calc(100vw-90px)] z-20 w-64 glass rounded-2xl p-3 animate-fade-in">
               <p className="avlabel uppercase tracking-[0.12em] mb-2">Squawk — parkeer je gedachte</p>
               <input
                 autoFocus
@@ -378,7 +378,7 @@ export default function ActiveFlight() {
           )}
 
           {soundPanel && (
-            <div className="absolute top-[178px] right-[70px] z-20 w-60 glass rounded-2xl overflow-hidden animate-fade-in">
+            <div className="absolute top-[178px] right-[70px] max-w-[calc(100vw-90px)] z-20 w-60 glass rounded-2xl overflow-hidden animate-fade-in">
               <p className="avlabel uppercase tracking-[0.12em] px-4 pt-3 pb-1.5">Geluid aan boord</p>
               <div className="divide-y divide-white/[0.06]">
                 <button
@@ -404,10 +404,12 @@ export default function ActiveFlight() {
 
           {/* big-type HUD (reference style) */}
           <div className="absolute bottom-0 inset-x-0 px-6 pb-6 pt-2 animate-fade-in [text-shadow:0_2px_12px_rgba(0,0,0,0.8)]">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[14px] text-white/60 font-medium">Resterende tijd</p>
-                <p className="text-[30px] leading-[1.05] font-bold tracking-tight tabular-nums whitespace-nowrap">
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[12px] sm:text-[14px] text-white/60 font-medium whitespace-nowrap">
+                  Resterende tijd
+                </p>
+                <p className="text-[24px] sm:text-[30px] leading-[1.05] font-bold tracking-tight tabular-nums whitespace-nowrap">
                   {bigTime(remaining)}
                 </p>
               </div>
@@ -424,14 +426,14 @@ export default function ActiveFlight() {
                   <button
                     onClick={togglePause}
                     aria-label={paused ? 'Hervat' : 'Pauze'}
-                    className="w-10 h-10 rounded-full bg-white text-black grid place-items-center active:scale-95 transition-transform shadow-lg"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white text-black grid place-items-center active:scale-95 transition-transform shadow-lg"
                   >
                     {paused ? <IconPlay size={16} /> : <IconPause size={16} />}
                   </button>
                   <button
                     onClick={onCancel}
                     aria-label="Vlucht afbreken"
-                    className="w-10 h-10 rounded-full bg-black/55 border border-white/20 text-white/85 grid place-items-center active:scale-95 transition-transform"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/55 border border-white/20 text-white/85 grid place-items-center active:scale-95 transition-transform"
                   >
                     <IconX size={15} />
                   </button>
@@ -439,17 +441,19 @@ export default function ActiveFlight() {
                     onClick={skipToLanding}
                     aria-label="Spoel door naar de landing"
                     title="Naar de laatste minuut"
-                    className="w-10 h-10 rounded-full bg-black/55 border border-white/20 text-white/85 grid place-items-center active:scale-95 transition-transform"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/55 border border-white/20 text-white/85 grid place-items-center active:scale-95 transition-transform"
                   >
                     <IconSkipEnd size={16} />
                   </button>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-[14px] text-white/60 font-medium">Afstand te gaan</p>
-                <p className="text-[30px] leading-[1.05] font-bold tracking-tight tabular-nums whitespace-nowrap">
+              <div className="text-right min-w-0">
+                <p className="text-[12px] sm:text-[14px] text-white/60 font-medium whitespace-nowrap">
+                  Afstand te gaan
+                </p>
+                <p className="text-[24px] sm:text-[30px] leading-[1.05] font-bold tracking-tight tabular-nums whitespace-nowrap">
                   {Math.round(tel.dtgKm).toLocaleString('nl-NL')}
-                  <span className="text-[17px] font-semibold text-white/80"> km</span>
+                  <span className="text-[15px] sm:text-[17px] font-semibold text-white/80"> km</span>
                 </p>
               </div>
             </div>

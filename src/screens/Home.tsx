@@ -151,8 +151,10 @@ export default function Home() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="px-2">
-      <p className="text-[19px] font-bold tabular-nums">{value}</p>
+    <div className="px-1 min-w-0">
+      <p className="text-[17px] font-bold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">
+        {value}
+      </p>
       <p className="text-[12px] text-white/45 mt-0.5">{label}</p>
     </div>
   )

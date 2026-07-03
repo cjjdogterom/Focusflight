@@ -1,4 +1,3 @@
-import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { IconBack } from '../components/icons'
 import { airportByIata } from '../data/airports'
@@ -6,7 +5,6 @@ import { STANDARD } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
 import { distanceKm } from '../lib/geo'
 import { flightMinutes, formatMinutes, intentMeta } from '../lib/flight'
-import { playTear } from '../lib/audio'
 
 export default function BoardingPass() {
   const home = useStore((s) =>
@@ -20,26 +18,6 @@ export default function BoardingPass() {
   const boarding = useStore((s) => s.boarding)
   const setScreen = useStore((s) => s.setScreen)
   const beginFlight = useStore((s) => s.beginFlight)
-  const [tearX, setTearX] = useState(0)
-  const [torn, setTorn] = useState(false)
-  const tearing = useRef(false)
-  const stripRef = useRef<HTMLDivElement>(null)
-
-  const tearFrom = (clientX: number) => {
-    const el = stripRef.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const p = Math.max(0, Math.min(1, (clientX - r.left) / r.width))
-    setTearX(p)
-    if (p > 0.92 && !torn) {
-      setTorn(true)
-      tearing.current = false
-      playTear()
-      if ('vibrate' in navigator) navigator.vibrate?.([12, 30, 18])
-      window.setTimeout(() => void beginFlight(), 550)
-    }
-  }
-
   const dest = booking.destinationIata ? airportByIata(booking.destinationIata) : undefined
   const livery = liveryById(booking.liveryId)
   const intent = intentMeta(booking.intent)
@@ -141,44 +119,11 @@ export default function BoardingPass() {
           </div>
         </div>
 
-        {/* tear the stub along the perforation to board */}
-        <div
-          ref={stripRef}
-          className="relative rounded-2xl overflow-hidden bg-[#f7f9fc] text-night-900 select-none touch-none cursor-grab active:cursor-grabbing"
-          onPointerDown={(e) => {
-            tearing.current = true
-            e.currentTarget.setPointerCapture(e.pointerId)
-            tearFrom(e.clientX)
-          }}
-          onPointerMove={(e) => tearing.current && !torn && tearFrom(e.clientX)}
-          onPointerUp={() => (tearing.current = false)}
-          onDoubleClick={() => !torn && (setTorn(true), playTear(), window.setTimeout(() => void beginFlight(), 450))}
-          aria-label="Scheur de strook af om te boarden"
-          role="button"
-        >
-          <div
-            className={`px-5 py-4 flex items-center justify-between transition-transform duration-500 ${
-              torn ? 'translate-x-[110%] rotate-3' : ''
-            }`}
-            style={!torn && tearX > 0 ? { transform: `translateX(${tearX * 12}px) rotate(${tearX * 1.2}deg)` } : undefined}
-          >
-            <div>
-              <p className="text-[9px] uppercase tracking-[0.2em] text-night-900/45">Boarding stub</p>
-              <p className="font-semibold text-[15px]">Scheur af om te boarden</p>
-            </div>
-            <p className="font-mono text-[11px] text-night-900/55">{boarding.flightNo}</p>
-          </div>
-          {/* perforatierand links + voortgang van de scheur */}
-          <div className="absolute inset-y-0 left-0 w-1.5 [background:repeating-linear-gradient(180deg,rgba(10,14,20,0.25)_0_5px,transparent_5px_10px)]" />
-          {!torn && (
-            <div
-              className="absolute inset-y-0 left-0 bg-night-900/10 pointer-events-none"
-              style={{ width: `${tearX * 100}%` }}
-            />
-          )}
-        </div>
+        <button className="btn-primary w-full text-lg" onClick={() => beginFlight()}>
+          Board &amp; start focus
+        </button>
         <p className="text-center avlabel">
-          {torn ? 'Welkom aan boord' : `Deuren sluiten bij vertrek — ${formatMinutes(durationMin)} aan boord`}
+          Deuren sluiten bij vertrek — {formatMinutes(durationMin)} aan boord
         </p>
       </div>
     </div>
