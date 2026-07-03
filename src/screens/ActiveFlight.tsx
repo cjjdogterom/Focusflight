@@ -10,7 +10,7 @@ import { useFullscreen } from '../lib/fullscreen'
 import { aircraftById } from '../data/aircraft'
 import { liveryById } from '../data/liveries'
 import { buildProfile, type FlightProfile } from '../lib/profile'
-import { positionAt } from '../lib/geo'
+import { positionAt, distanceKm } from '../lib/geo'
 import { startAmbience, stopAmbience, playGear, SOUNDSCAPES } from '../lib/audio'
 import runwaysData from '../data/runways.json'
 
@@ -87,11 +87,20 @@ export default function ActiveFlight() {
   const depRwy = RUNWAYS[active.route.from.iata] ?? { lengthM: 3200, ident: '?' }
   const arrRwy = RUNWAYS[active.route.to.iata] ?? { lengthM: 3000, ident: '?' }
 
-  const profile = useMemo(
-    () => buildProfile(duration, aircraft, depRwy.lengthM, arrRwy.lengthM),
+  const profile = useMemo(() => {
+    // the profile pins its runway physics to the exact ground geometry, so
+    // acceleration and braking on the map match the real aircraft
+    let pathKm = 0
+    const pts = active.route.points
+    for (let i = 1; i < pts.length; i++) pathKm += distanceKm(pts[i - 1], pts[i])
+    return buildProfile(duration, aircraft, {
+      pathKm,
+      // fallbacks for flights persisted before groundM existed
+      depRollM: active.route.groundM?.dep ?? Math.min(1600, depRwy.lengthM * 0.85),
+      arrRollM: active.route.groundM?.arr ?? Math.min(1400, arrRwy.lengthM * 0.75),
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [active.startedAtMs],
-  )
+  }, [active.startedAtMs])
 
   const [remaining, setRemaining] = useState(duration)
   const [phase, setPhase] = useState<string>('roll')

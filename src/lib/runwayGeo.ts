@@ -176,21 +176,40 @@ function courseBetween(a: LngLat, b: LngLat): number {
   return bearing(a, b)
 }
 
+// real jet physics on the runway: max-thrust roll of ~2.1 m/s² lifts a 747
+// off after ~1.6 km (NOT the whole strip), and reversers+autobrake stop it in
+// ~1.4 km after touchdown. The flight profile pins its ground phases to these
+// exact geometric lengths, so keep them in sync via takeoffRollM/landingRollM.
+export function takeoffRollM(rw: RunwayInfo): number {
+  return Math.min(1600, rw.lengthM * 0.85)
+}
+export function landingRollM(rw: RunwayInfo): number {
+  return Math.min(1400, rw.lengthM * 0.75)
+}
+
 /** threshold → ground roll → straight initial climb → banked turn onto the route */
-export function departurePath(rw: RunwayInfo, firstFix: LngLat): LngLat[] {
+export function departurePath(
+  rw: RunwayInfo,
+  firstFix: LngLat,
+): { points: LngLat[]; groundM: number } {
+  const rollM = takeoffRollM(rw)
   const pts: LngLat[] = []
+  // liftoff after the physical takeoff roll, well before the end of the strip
   for (let i = 0; i <= 4; i++) {
-    pts.push(offsetM(rw.threshold, rw.headingDeg, (rw.lengthM * i) / 4))
+    pts.push(offsetM(rw.threshold, rw.headingDeg, (rollM * i) / 4))
   }
   // climb straight ahead past the runway end before any turn (like a real SID)
   const climbEnd = offsetM(rw.end, rw.headingDeg, 2800)
   pts.push(climbEnd)
   pts.push(...turnJoin(climbEnd, rw.headingDeg, firstFix, 3))
-  return pts
+  return { points: pts, groundM: rollM }
 }
 
 /** banked turn onto a long straight final → threshold → roll out on the strip */
-export function arrivalPath(rw: RunwayInfo, lastFix: LngLat): LngLat[] {
+export function arrivalPath(
+  rw: RunwayInfo,
+  lastFix: LngLat,
+): { points: LngLat[]; groundM: number } {
   const approach = (rw.headingDeg + 180) % 360
   const finalStart = offsetM(rw.threshold, approach, 9000) // ~9 km final
   const pts: LngLat[] = []
@@ -202,9 +221,10 @@ export function arrivalPath(rw: RunwayInfo, lastFix: LngLat): LngLat[] {
   pts.push(offsetM(rw.threshold, approach, 4500))
   pts.push(offsetM(rw.threshold, approach, 1500))
   pts.push(rw.threshold)
-  // decelerate on the runway and stop ~70% down the strip
+  // braking distance with reversers + autobrake — stop ON the strip
+  const rollM = landingRollM(rw)
   for (let i = 1; i <= 3; i++) {
-    pts.push(offsetM(rw.threshold, rw.headingDeg, rw.lengthM * 0.7 * (i / 3)))
+    pts.push(offsetM(rw.threshold, rw.headingDeg, rollM * (i / 3)))
   }
-  return pts
+  return { points: pts, groundM: rollM }
 }

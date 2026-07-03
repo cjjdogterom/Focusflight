@@ -35,6 +35,9 @@ export interface Route {
   chart: boolean
   /** chosen runway ends, when runway data exists for the airports */
   runways?: { dep: RunwayInfo | null; arr: RunwayInfo | null }
+  /** metres of ground roll at each end of `points` (takeoff roll / roll-out) —
+   *  the flight profile pins its runway physics to exactly these lengths */
+  groundM?: { dep: number; arr: number }
 }
 
 const ROUTE_CATALOG = routesData as unknown as Record<string, number[][]>
@@ -49,16 +52,23 @@ function withRunways(
   from: Airport,
   to: Airport,
   coords: LngLat[],
-): { coords: LngLat[]; dep: RunwayInfo | null; arr: RunwayInfo | null } {
+): {
+  coords: LngLat[]
+  dep: RunwayInfo | null
+  arr: RunwayInfo | null
+  groundM: { dep: number; arr: number }
+} {
   const a: LngLat = [from.lon, from.lat]
   const b: LngLat = [to.lon, to.lat]
+  // without runway geometry the roll happens along the start/end of the route
+  const noRunways = { dep: 1600, arr: 1400 }
 
   // first/last fixes far enough out that the blend has room to turn
   let fi = 1
   while (fi < coords.length - 1 && distanceKm(a, coords[fi]) < 6) fi++
   let li = coords.length - 2
   while (li > fi && distanceKm(b, coords[li]) < 12) li--
-  if (li <= fi) return { coords, dep: null, arr: null }
+  if (li <= fi) return { coords, dep: null, arr: null, groundM: noRunways }
 
   const dep = runwayFor(from, bearing(a, coords[fi]))
   const arr = runwayFor(to, bearing(coords[li], b))
@@ -77,14 +87,24 @@ function withRunways(
     const need = () => 12 + (angDiff(arr.headingDeg, bearing(coords[li], b)) / 180) * 26
     while (li > fi + 1 && distanceKm(b, coords[li]) < need()) li--
   }
-  if (li <= fi) return { coords, dep: null, arr: null }
+  if (li <= fi) return { coords, dep: null, arr: null, groundM: noRunways }
   const inner = coords.slice(fi, li + 1)
+  const depPath = dep ? departurePath(dep, coords[fi]) : null
+  const arrPath = arr ? arrivalPath(arr, coords[li]) : null
   const out: LngLat[] = [
-    ...(dep ? departurePath(dep, coords[fi]) : [a]),
+    ...(depPath ? depPath.points : [a]),
     ...inner,
-    ...(arr ? arrivalPath(arr, coords[li]) : [b]),
+    ...(arrPath ? arrPath.points : [b]),
   ]
-  return { coords: out, dep, arr }
+  return {
+    coords: out,
+    dep,
+    arr,
+    groundM: {
+      dep: depPath?.groundM ?? noRunways.dep,
+      arr: arrPath?.groundM ?? noRunways.arr,
+    },
+  }
 }
 
 function buildRoute(
@@ -119,6 +139,7 @@ function buildRoute(
     source,
     chart: true,
     runways: { dep, arr },
+    groundM: built.groundM,
   }
 }
 
