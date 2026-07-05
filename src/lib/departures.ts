@@ -84,7 +84,8 @@ function toDeparture(f: RawFlight): Departure | null {
   if (!airline) return null
   if (f.serviceType && f.serviceType !== 'J') return null // scheduled passenger only
   if (f.mainFlight && f.mainFlight !== f.name) return null // skip codeshare shadows
-  if (f.states.includes('DEP') || f.states.includes('CNX') || f.states.includes('TOM')) return null
+  // departed, cancelled, tomorrow, or gate already closed: too late to board
+  if (['DEP', 'CNX', 'TOM', 'GTD'].some((s) => f.states.includes(s))) return null
   const airport = airportByIata(f.dest)
   if (!airport) return null
   const d = new Date(f.schedule)
