@@ -106,7 +106,7 @@ interface State {
 
   updateBooking: (patch: Partial<BookingDraft>) => void
   pickRandomDestination: () => void
-  startBoarding: () => void
+  startBoarding: (info?: Partial<BoardingInfo>) => void
   beginFlight: () => Promise<void>
   finishFlight: (completedSec: number, fraction: number, endedAtMs?: number) => Promise<void>
   abortFlight: (completedSec: number, fraction: number) => Promise<void>
@@ -283,10 +283,12 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({ booking: { ...s.booking, destinationIata: dest.iata } }))
   },
 
-  startBoarding: () =>
+  startBoarding: (info) =>
     set({
       screen: 'boarding',
-      boarding: { seat: seatCode(), gate: gateCode(), flightNo: flightNo() },
+      // real flight data (check-in on the departure board) overrides the
+      // generated boarding info — flight number and gate come from Schiphol
+      boarding: { seat: seatCode(), gate: gateCode(), flightNo: flightNo(), ...info },
     }),
 
   beginFlight: async () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { AIRPORTS, airportByIata, searchAirports } from '../data/airports'
 import { STANDARD } from '../data/aircraft'
@@ -6,6 +6,7 @@ import { IconPlane, IconBack, IconCheck } from '../components/icons'
 import { distanceKm } from '../lib/geo'
 import { prefetchRoute } from '../lib/routeFetch'
 import { INTENTS, flightMinutes, formatMinutes } from '../lib/flight'
+import { fetchDepartures, type Departure, type DeparturesResult } from '../lib/departures'
 import type { Airport } from '../types'
 
 export default function Booking() {
@@ -142,6 +143,18 @@ export default function Booking() {
           </button>
         </div>
 
+        {/* real departures from Schiphol — check in and fly a real flight */}
+        <DepartureBoard
+          visited={visited}
+          onCheckIn={(d) => {
+            update({ originIata: 'AMS', destinationIata: d.destIata })
+            const ams = airportByIata('AMS')
+            const dst = airportByIata(d.destIata)
+            if (ams && dst) prefetchRoute(ams, dst)
+            startBoarding({ flightNo: d.flightNo, gate: d.gate ?? undefined })
+          }}
+        />
+
         {/* pick by focus duration: slider + matching destinations */}
         <section>
           <p className="avlabel uppercase tracking-[0.12em] mb-2.5">Kies op focusduur</p>
@@ -254,6 +267,109 @@ export default function Booking() {
 }
 
 // ---------------------------------------------------------------------------
+
+/** live Schiphol departure board: check in on a real flight about to leave */
+function DepartureBoard({
+  visited,
+  onCheckIn,
+}: {
+  visited: Set<string>
+  onCheckIn: (d: Departure) => void
+}) {
+  const [result, setResult] = useState<DeparturesResult | null>(null)
+  const ams = airportByIata('AMS')
+
+  useEffect(() => {
+    let alive = true
+    const load = () => void fetchDepartures().then((r) => alive && setResult(r))
+    load()
+    const id = window.setInterval(load, 60_000) // board refreshes every minute
+    return () => {
+      alive = false
+      window.clearInterval(id)
+    }
+  }, [])
+
+  if (result?.kind === 'unavailable') return null
+
+  return (
+    <section>
+      <p className="avlabel uppercase tracking-[0.12em] mb-2.5">
+        Vertrekbord Schiphol · echte vluchten
+      </p>
+      {result === null && (
+        <div className="card px-5 py-4 text-[13px] text-white/45">Vertrekbord laden…</div>
+      )}
+      {result?.kind === 'not-configured' && (
+        <div className="card px-5 py-4">
+          <p className="text-[13px] text-white/70 leading-relaxed">
+            Nog niet geactiveerd — hiervoor is een gratis API-sleutel van{' '}
+            <span className="font-semibold">developer.schiphol.nl</span> nodig.
+          </p>
+        </div>
+      )}
+      {result?.kind === 'ok' && result.departures.length === 0 && (
+        <div className="card px-5 py-4 text-[13px] text-white/45">
+          Geen vertrekkende vluchten van de grote maatschappijen in de komende uren.
+        </div>
+      )}
+      {result?.kind === 'ok' && result.departures.length > 0 && (
+        <div className="card overflow-hidden divide-y divide-white/[0.06]">
+          {result.departures.slice(0, 6).map((d) => {
+            const dst = airportByIata(d.destIata)
+            const min =
+              ams && dst
+                ? flightMinutes(distanceKm([ams.lon, ams.lat], [dst.lon, dst.lat]), STANDARD)
+                : 0
+            return (
+              <button
+                key={d.flightNo}
+                onClick={() => onCheckIn(d)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] active:bg-white/[0.1] transition"
+                aria-label={`Check in op ${d.flightNo} naar ${d.destCity}`}
+              >
+                <span className="w-12 shrink-0 text-[14px] font-semibold tabular-nums text-white/85">
+                  {d.schedTime}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold text-[14px] tabular-nums">{d.flightNo}</span>
+                    <IataBadge iata={d.destIata} visited={visited.has(d.destIata)} />
+                    {d.demo && (
+                      <span className="text-[9px] font-bold tracking-[0.14em] uppercase px-1.5 py-0.5 rounded bg-white/10 text-white/50">
+                        Demo
+                      </span>
+                    )}
+                  </span>
+                  <span className="block truncate text-[12px] text-white/45 mt-0.5">
+                    {d.destCity} · {d.airline}
+                    {d.gate ? ` · gate ${d.gate}` : ''}
+                    {min ? ` · ${formatMinutes(min)} focus` : ''}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-md ${
+                    d.boarding
+                      ? 'bg-amber-400/15 text-amber-300'
+                      : 'bg-white/[0.07] text-white/55'
+                  }`}
+                >
+                  {d.boarding ? 'Boarding' : (d.status ?? 'Gepland')}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {result?.kind === 'ok' && (
+        <p className="text-[11px] text-white/35 mt-2 px-1">
+          Check in en jouw focussessie wordt die echte vlucht — zelfde vluchtnummer, gate en
+          vluchtduur.
+        </p>
+      )}
+    </section>
+  )
+}
 
 function DestinationPicker({
   home,
