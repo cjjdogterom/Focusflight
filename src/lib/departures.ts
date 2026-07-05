@@ -14,7 +14,10 @@ export interface Departure {
   /** scheduled departure, local Schiphol time "HH:MM" */
   schedTime: string
   scheduleISO: string
-  status: string | null // Dutch label, e.g. "Boarding"
+  /** remark exactly as the real Schiphol boards word it, e.g. "Nu instappen" */
+  status: string | null
+  /** remark colour on the real board: green = boarding, red = urgent/delay */
+  tone: 'green' | 'red' | null
   boarding: boolean
   gate: string | null
   demo?: boolean
@@ -54,16 +57,13 @@ const MAJORS: Record<string, string> = {
   TP: 'TAP Portugal',
 }
 
-const STATUS_NL: Record<string, string> = {
-  SCH: 'Gepland',
-  DEL: 'Vertraagd',
-  WIL: 'Wacht op indeling',
-  GTO: 'Gate open',
-  BRD: 'Boarding',
-  GCL: 'Gate sluit',
-  GTD: 'Gate dicht',
-  GCH: 'Gate gewijzigd',
-  TOM: 'Morgen',
+// remark texts as they appear on the physical Schiphol departure boards
+const STATUS_NL: Record<string, { text: string; tone: 'green' | 'red' | null }> = {
+  BRD: { text: 'Nu instappen', tone: 'green' },
+  GCL: { text: 'Gate gaat dicht', tone: 'red' },
+  GTO: { text: 'Naar de gate', tone: null },
+  DEL: { text: 'Vertraagd', tone: 'red' },
+  GCH: { text: 'Gate gewijzigd', tone: null },
 }
 
 interface RawFlight {
@@ -91,7 +91,9 @@ function toDeparture(f: RawFlight): Departure | null {
   const d = new Date(f.schedule)
   if (Number.isNaN(d.getTime())) return null
   const boarding = f.states.includes('BRD') || f.states.includes('GTO') || f.states.includes('GCL')
-  const stateCode = ['BRD', 'GCL', 'GTO', 'DEL', 'GCH', 'SCH'].find((s) => f.states.includes(s))
+  // GCL (gate closing) outranks BRD on the real board — it is more urgent
+  const stateCode = ['GCL', 'BRD', 'GTO', 'DEL', 'GCH'].find((s) => f.states.includes(s))
+  const remark = stateCode ? STATUS_NL[stateCode] : null
   return {
     flightNo: f.name.replace(/^([A-Z0-9]{2})\s?0*/, '$1 '),
     airline,
@@ -103,7 +105,8 @@ function toDeparture(f: RawFlight): Departure | null {
       timeZone: 'Europe/Amsterdam',
     }),
     scheduleISO: f.schedule,
-    status: stateCode ? STATUS_NL[stateCode] : null,
+    status: remark?.text ?? null,
+    tone: remark?.tone ?? null,
     boarding,
     gate: f.gate,
   }
@@ -146,14 +149,14 @@ function demoBoard(): Departure[] {
       hm: d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
     }
   }
-  const rows: [string, string, string, string, string | null, string][] = [
-    ['KL 1673', 'KLM', 'BCN', 'Barcelona', 'Boarding', 'B24'],
-    ['KL 605', 'KLM', 'SFO', 'San Francisco', 'Gate open', 'E18'],
-    ['AF 1241', 'Air France', 'CDG', 'Parijs', 'Gepland', 'C11'],
-    ['EY 78', 'Etihad', 'AUH', 'Abu Dhabi', 'Gepland', 'F7'],
-    ['KL 1775', 'KLM', 'BER', 'Berlijn', 'Gepland', 'B36'],
+  const rows: [string, string, string, string, string | null, 'green' | 'red' | null, string][] = [
+    ['KL 1673', 'KLM', 'BCN', 'Barcelona', 'Nu instappen', 'green', 'B24'],
+    ['KL 605', 'KLM', 'SFO', 'San Francisco', 'Gate gaat dicht', 'red', 'E18'],
+    ['AF 1241', 'Air France', 'CDG', 'Parijs', 'Naar de gate', null, 'C11'],
+    ['EY 78', 'Etihad', 'AUH', 'Abu Dhabi', 'Vertraagd', 'red', 'F7'],
+    ['KL 1775', 'KLM', 'BER', 'Berlijn', null, null, 'B36'],
   ]
-  return rows.map(([flightNo, airline, destIata, destCity, status, gate], i) => {
+  return rows.map(([flightNo, airline, destIata, destCity, status, tone, gate], i) => {
     const t = mk(12 + i * 25)
     return {
       flightNo,
@@ -163,7 +166,8 @@ function demoBoard(): Departure[] {
       schedTime: t.hm,
       scheduleISO: t.iso,
       status,
-      boarding: status === 'Boarding' || status === 'Gate open',
+      tone,
+      boarding: tone === 'green' || status === 'Gate gaat dicht',
       gate,
       demo: true,
     }

@@ -145,7 +145,6 @@ export default function Booking() {
 
         {/* real departures from Schiphol — check in and fly a real flight */}
         <DepartureBoard
-          visited={visited}
           onCheckIn={(d) => {
             update({ originIata: 'AMS', destinationIata: d.destIata })
             const ams = airportByIata('AMS')
@@ -268,103 +267,146 @@ export default function Booking() {
 
 // ---------------------------------------------------------------------------
 
+// Schiphol board palette, matched against photos of the real screens:
+// yellow header + gate blocks, navy type on a pale lavender body, green
+// "Nu instappen" / red "Gate gaat dicht" remarks, blue footer bar.
+const SB = {
+  yellow: '#f2be19',
+  navy: '#151a4d',
+  body: '#e9ebf4',
+  row: '#e3e6f1',
+  green: '#1d8a3f',
+  red: '#d61f45',
+  blue: '#2b62d9',
+}
+
 /** live Schiphol departure board: check in on a real flight about to leave */
-function DepartureBoard({
-  visited,
-  onCheckIn,
-}: {
-  visited: Set<string>
-  onCheckIn: (d: Departure) => void
-}) {
+function DepartureBoard({ onCheckIn }: { onCheckIn: (d: Departure) => void }) {
   const [result, setResult] = useState<DeparturesResult | null>(null)
-  const ams = airportByIata('AMS')
+  const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
     let alive = true
     const load = () => void fetchDepartures().then((r) => alive && setResult(r))
     load()
     const id = window.setInterval(load, 60_000) // board refreshes every minute
+    const clock = window.setInterval(() => setNow(new Date()), 1000)
     return () => {
       alive = false
       window.clearInterval(id)
+      window.clearInterval(clock)
     }
   }, [])
 
   if (result?.kind === 'unavailable') return null
 
+  const clock = now.toLocaleTimeString('nl-NL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+  const date = now.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+
   return (
     <section>
-      <p className="avlabel uppercase tracking-[0.12em] mb-2.5">
-        Vertrekbord Schiphol · echte vluchten
-      </p>
       {result === null && (
         <div className="card px-5 py-4 text-[13px] text-white/45">Vertrekbord laden…</div>
       )}
       {result?.kind === 'not-configured' && (
         <div className="card px-5 py-4">
           <p className="text-[13px] text-white/70 leading-relaxed">
-            Nog niet geactiveerd — hiervoor is een gratis API-sleutel van{' '}
+            Vertrekbord nog niet geactiveerd — hiervoor is een gratis API-sleutel van{' '}
             <span className="font-semibold">developer.schiphol.nl</span> nodig.
           </p>
         </div>
       )}
-      {result?.kind === 'ok' && result.departures.length === 0 && (
-        <div className="card px-5 py-4 text-[13px] text-white/45">
-          Geen vertrekkende vluchten van de grote maatschappijen in de komende uren.
-        </div>
-      )}
-      {result?.kind === 'ok' && result.departures.length > 0 && (
-        <div className="card overflow-hidden divide-y divide-white/[0.06]">
-          {result.departures.slice(0, 6).map((d) => {
-            const dst = airportByIata(d.destIata)
-            const min =
-              ams && dst
-                ? flightMinutes(distanceKm([ams.lon, ams.lat], [dst.lon, dst.lat]), STANDARD)
-                : 0
-            return (
+      {result?.kind === 'ok' && (
+        <div className="rounded-lg overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+          {/* yellow title bar, exactly like the physical screens */}
+          <div
+            className="flex items-center gap-2 px-3.5 py-2"
+            style={{ background: SB.yellow, color: SB.navy }}
+          >
+            <IconPlane size={14} className="shrink-0" />
+            <p className="font-bold text-[13px] min-[420px]:text-[14.5px] tracking-tight whitespace-nowrap">
+              Flight departures <span className="font-normal opacity-70">|</span> Vertrekken
+            </p>
+          </div>
+
+          {/* clock strip + column headers on the pale body */}
+          <div style={{ background: SB.body, color: SB.navy }}>
+            <div className="flex items-baseline justify-between px-3.5 pt-1.5 pb-0.5">
+              <span className="text-[13px] font-semibold tabular-nums">{clock}</span>
+              <span className="text-[12.5px] italic">{date}</span>
+            </div>
+            <div
+              className="flex items-center gap-2 px-3.5 pb-1 text-[10px] font-semibold"
+              style={{ color: `${SB.navy}b3` }}
+            >
+              <span className="w-10 shrink-0">Tijd</span>
+              <span className="flex-1">Bestemming</span>
+              <span className="w-14 shrink-0 hidden min-[420px]:block">Vlucht</span>
+              <span className="w-[92px] min-[420px]:w-[104px] shrink-0">Opmerkingen</span>
+              <span className="w-9 shrink-0 text-right">Gate</span>
+            </div>
+
+            {result.departures.length === 0 && (
+              <p className="px-3.5 py-5 text-[13px]" style={{ color: `${SB.navy}99` }}>
+                Geen vertrekkende vluchten van de grote maatschappijen in de komende uren.
+              </p>
+            )}
+
+            {result.departures.slice(0, 7).map((d, i) => (
               <button
                 key={d.flightNo}
                 onClick={() => onCheckIn(d)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] active:bg-white/[0.1] transition"
+                className="w-full flex items-center gap-2 px-3.5 py-[7px] text-left transition active:brightness-95"
+                style={{ background: i % 2 ? SB.row : SB.body, color: SB.navy }}
                 aria-label={`Check in op ${d.flightNo} naar ${d.destCity}`}
               >
-                <span className="w-12 shrink-0 text-[14px] font-semibold tabular-nums text-white/85">
+                <span className="w-10 shrink-0 text-[13px] font-bold tabular-nums">
                   {d.schedTime}
                 </span>
-                <span className="flex-1 min-w-0">
-                  <span className="flex items-center gap-2">
-                    <span className="font-semibold text-[14px] tabular-nums">{d.flightNo}</span>
-                    <IataBadge iata={d.destIata} visited={visited.has(d.destIata)} />
-                    {d.demo && (
-                      <span className="text-[9px] font-bold tracking-[0.14em] uppercase px-1.5 py-0.5 rounded bg-white/10 text-white/50">
-                        Demo
-                      </span>
-                    )}
-                  </span>
-                  <span className="block truncate text-[12px] text-white/45 mt-0.5">
-                    {d.destCity} · {d.airline}
-                    {d.gate ? ` · gate ${d.gate}` : ''}
-                    {min ? ` · ${formatMinutes(min)} focus` : ''}
-                  </span>
+                <span className="flex-1 min-w-0 text-[13px] font-semibold truncate">
+                  {d.destCity}
+                  {d.demo && <span className="ml-1.5 text-[9px] font-bold opacity-40">DEMO</span>}
+                </span>
+                <span className="w-14 shrink-0 text-[12.5px] tabular-nums hidden min-[420px]:block">
+                  {d.flightNo}
                 </span>
                 <span
-                  className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-md ${
-                    d.boarding
-                      ? 'bg-amber-400/15 text-amber-300'
-                      : 'bg-white/[0.07] text-white/55'
-                  }`}
+                  className="w-[92px] min-[420px]:w-[104px] shrink-0 text-[11px] min-[420px]:text-[11.5px] truncate"
+                  style={{
+                    color: d.tone === 'green' ? SB.green : d.tone === 'red' ? SB.red : SB.navy,
+                  }}
                 >
-                  {d.boarding ? 'Boarding' : (d.status ?? 'Gepland')}
+                  {d.status ?? ''}
+                </span>
+                <span className="w-9 shrink-0 flex justify-end">
+                  {d.gate && (
+                    <span
+                      className="text-[11px] font-bold px-1 py-[1px] rounded-[2px] tabular-nums"
+                      style={{ background: SB.yellow, color: SB.navy }}
+                    >
+                      {d.gate}
+                    </span>
+                  )}
                 </span>
               </button>
-            )
-          })}
+            ))}
+          </div>
+
+          {/* blue footer band with the airport welcome line */}
+          <div style={{ background: SB.blue }} className="px-3.5 py-1.5 flex items-center justify-between">
+            <span className="text-[10.5px] text-white/85">Welcome to Amsterdam Airport</span>
+            <span className="text-[13px] font-bold italic text-white tracking-tight">Schiphol</span>
+          </div>
         </div>
       )}
       {result?.kind === 'ok' && (
         <p className="text-[11px] text-white/35 mt-2 px-1">
-          Check in en jouw focussessie wordt die echte vlucht — zelfde vluchtnummer, gate en
-          vluchtduur.
+          Tik op een vlucht om in te checken — jouw focussessie wordt die echte vlucht, met
+          hetzelfde vluchtnummer, dezelfde gate en de echte vluchtduur.
         </p>
       )}
     </section>
